@@ -1,5 +1,5 @@
 import unittest
-from ts_disagg import disaggregate_series
+from tsdisagg import disaggregate_series
 import pandas as pd
 import pandas.testing as pd_testing
 
@@ -88,7 +88,7 @@ class DisaggregationTests(unittest.TestCase):
         expected.columns = ['sales']
 
         sales_q_dc = disaggregate_series(self.sales_a,
-                                         df2=self.exports_q,
+                                         high_freq_df=self.exports_q,
                                          method='denton-cholette',
                                          agg_func='sum',
                                          optimizer_kwargs={'method': 'powell'},
@@ -102,7 +102,7 @@ class DisaggregationTests(unittest.TestCase):
         expected.columns = ['sales']
 
         sales_m_litterman = disaggregate_series(self.sales_a,
-                                                df2=self.exports_m.assign(Constant = 1),
+                                                high_freq_df=self.exports_m.assign(Constant = 1),
                                                 method='litterman',
                                                 agg_func='sum',
                                                 optimizer_kwargs={'method': 'nelder-mead'},

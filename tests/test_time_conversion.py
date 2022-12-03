@@ -1,15 +1,15 @@
 import unittest
-from ts_disagg.time_conversion import make_companion_index, MONTHS, auto_step_down_base_freq, get_frequency_names
+from tsdisagg.time_conversion import make_companion_index, MONTHS, auto_step_down_base_freq, get_frequency_names
 import pandas as pd
 import numpy as np
 
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
-from typing import Callable
+from typing import Callable, List, Tuple
 
 @composite
-def freq(draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]) -> tuple[str, str, bool]:
+def freq(draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]) -> Tuple[str, str, bool]:
 
     bases = [f'B{base}', f'{base}S', f'B{base}S']
     suffixes = [f'-{x}' for x in suffix_list] + ['']

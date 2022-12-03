@@ -3,7 +3,7 @@ from scipy.optimize import minimize
 import pandas as pd
 import numpy as np
 
-from ts_disagg.time_conversion import make_companion_index, auto_step_down_base_freq, validate_freqs, \
+from tsdisagg.time_conversion import make_companion_index, auto_step_down_base_freq, validate_freqs, \
     make_names_from_frequencies, align_and_merge_dfs, get_frequency_name, FREQ_CONVERSION_FACTORS
 
 
@@ -194,12 +194,14 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     return df, C_mask, time_conversion_factor
 
 
-def disaggregate_series(df1, df2=None, h=1,
+def disaggregate_series(low_freq_df,
+                        high_freq_df=None,
                         target_freq=None,
-                        method='denton-cholette',
-                        criterion='proportional',
                         target_column=None,
                         agg_func='sum',
+                        method='denton-cholette',
+                        criterion='proportional',
+                        h=1,
                         optimizer_kwargs=None,
                         verbose=True):
 
@@ -209,23 +211,28 @@ def disaggregate_series(df1, df2=None, h=1,
 
     Parameters
     ----------
-    df1: DataFrame
+    low_freq_df: DataFrame
         Low frequency time series to be converted
-    df2: Dataframe, Optional
+    high_freq_df: Dataframe, Optional
         High frequency companion data. The user can optionally supply data that is believed to be correlated with the
         low frequency data. This data will be used to interpolate the missing high frequency observations.
-    h: int, default 1
-        Number of differences to use when applying the Cholette correction to the Denton method. The Cholette method
-        corrects for high variance in the first few observations when using the Denton method. A higher h will result
-        in a more aggressive correction.
     target_freq: str, Optional
         The desired output frequency for the low frequency data. If None, the frequency of the low frequency data will
         be "stepped down" once, e.g. yearly to quarterly, or quarterly monthly. Should be a valid pandas frequency
         string; see the pandas documentation for details.
+    target_column: str, default "None"
+        If low_freq_df has multiple columns, the name of the column to be converted. If None, the first column in the
+        dataframe will be used.
+    agg_func: str, default "sum"
+        Function which the interpolated high frequency data should respect when aggregating back to the original low
+        frequency. One of: sum, mean, first, last.
+    criterion: str, default "proportional"
+        Objective function used by methods "denton" and "denton-cholette" to minimize the sum of square deviations from
+        the low frequency data and the interpolated high frequency data. One of "proportional" (deviation) or
+        "additive" (absolute deviation).
     method: str, default "denton"
         Method of interpolation to use. Currently, "denton", "denton-cholette", "chow-lin", and "litterman" are
         supported.
-
             Denton: Univariate method, naive interpolation that preserves the statistic specificed in the agg_func
                     argument only. The first several observation in the produced series will have unacceptably high
                     variance, so "denton-cholette" is recommended in all cases.
@@ -235,26 +242,32 @@ def disaggregate_series(df1, df2=None, h=1,
                     to be provided. For details, see [1]
             Litterman: Multivariate regression-based method which allows for multiple high-frequency indicator series
                     to be provided. For details, see [1].
-    criterion: str, default "proportional"
-        One of "proportional" or "additive". Used by methods "denton" and "denton-cholette" when constructing the
-    target_column
-    low_freq_is_start_date
-    agg_func
-    optimizer_kwargs
-    verbose
+    h: int, default 1
+        Number of differences to use when applying the Cholette correction to the Denton method. The Cholette method
+        corrects for high variance in the first few observations when using the Denton method. A higher h will result
+        in a more aggressive correction.
+    optimizer_kwargs: dict, Optional
+        A dictionary of keyword arguments to be passed to scipy.optimize.minimize. For full details, consult the
+        docstring of that function. Ignoired if method is "denton" or "denton-cholette", as these do not use numerical
+        optimization.
+    verbose: bool, default True
+        Whether to print regression results. Ignored if method is "denton" or "denton-cholette", as these have no
+        regression results to report.
 
     Returns
     -------
-
+    high_freq_df: Series
+        A Pandas Series object containing the interpolated high frequency data.
     """
+
     assert method in ['denton', 'denton-cholette', 'chow-lin', 'litterman']
     assert criterion in ['proportional', 'additive']
     assert agg_func in ['mean', 'sum', 'first', 'last']
 
-    target_column = target_column or df1.columns[0]
-    target_idx = np.flatnonzero(df1.columns == target_column)[0]
+    target_column = target_column or low_freq_df.columns[0]
+    target_idx = np.flatnonzero(low_freq_df.columns == target_column)[0]
 
-    df, C_mask, time_conversion_factor = prepare_input_dataframes(df1, df2, target_freq, method)
+    df, C_mask, time_conversion_factor = prepare_input_dataframes(low_freq_df, high_freq_df, target_freq, method)
 
     y = df.iloc[:, target_idx].dropna().values
     X = df.drop(columns=df.columns[target_idx]).values

@@ -1,21 +1,20 @@
 import unittest
-from ts_disagg.ts_disagg import build_conversion_matrix, prepare_input_dataframes
-from ts_disagg.time_conversion import MONTHS, CODE_TO_LONG_FREQ, OFFSET_CONVERSIONS, \
-    get_frequency_names, make_companion_index
+from tsdisagg.ts_disagg import prepare_input_dataframes
+from tsdisagg.time_conversion import MONTHS, get_frequency_names, make_companion_index
 
 from hypothesis.strategies import composite, SearchStrategy, integers
 from hypothesis import given
 
 import pandas as pd
 
-from typing import Callable
+from typing import Callable, List, Tuple
 import calendar
 
 
 @composite
 def freq(draw: Callable[[SearchStrategy[int]], int],
          base: str,
-         suffix_list: list[str]) -> tuple[str, str, str]:
+         suffix_list: List[str]) -> Tuple[str, str, str]:
 
     bases = [f'B{base}', f'{base}S', f'B{base}S']
     suffixes = [f'-{x}' for x in suffix_list] + ['']
