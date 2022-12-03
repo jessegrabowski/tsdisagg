@@ -219,8 +219,8 @@ def make_companion_index(df, target_freq):
 
     if not FREQ_TO_ORDER[low_freq_name] > FREQ_TO_ORDER[high_freq_name]:
         raise ValueError(f'target_freq must be of higher frequency than the frequency on the data. Found '
-                         f'target_freq {target_freq}, which is {high_freq_name}, while data is {low_freq.name}, which is '
-                         f'{low_freq_name}.')
+                         f'target_freq {target_freq}, which is {high_freq_name}, while data is {low_freq.name}, '
+                         f'which is {low_freq_name}.')
 
     low_freq_df = df.copy()
     start_date, end_date = low_freq_df.index[[0, -1]]

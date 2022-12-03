@@ -143,17 +143,32 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     df1_out = df1.copy()
 
     if not isinstance(df1.index, pd.core.indexes.datetimes.DatetimeIndex):
-        raise ValueError('No datetime index found on the dataframe passed as argument to df1.')
+        raise ValueError('No datetime index found on the dataframe passed as argument to low_freq_df.')
+
+    if df1.isna().any().any():
+        raise ValueError('low_freq_df has missing values.')
+
     if df2 is not None:
         if not isinstance(df2.index, pd.core.indexes.datetimes.DatetimeIndex):
-            raise ValueError('No datetime index found on the dataframe passed as argument to df1.')
+            raise ValueError('No datetime index found on the dataframe passed as argument to low_freq_df.')
+
+        if df2.isna().any().any():
+            raise ValueError('high_freq_df has missing values.')
+
+        if df2.index[0] > df1.index[0]:
+            raise ValueError(f'Start date found on high frequency data {df2.index[0]} is after start date found on '
+                             f'low frequency data {df1.index[0]}. Interpolation is not possible in this case, because '
+                             f'there is no observed high frequency data associated with the first '
+                             f'{(df1.index < df2.index[0]).sum()} low-frequency observations. '
+                             f'Align the start date of these two dataframes and try again.')
+
         df2_out = df2.copy()
     else:
         df2_out = df2
 
     low_freq = df1_out.index.freq or df1_out.index.inferred_freq
     if not low_freq:
-        raise ValueError('Dataframe df1 does not have a valid time index with frequency information')
+        raise ValueError('Low frequency dataframe does not have a valid time index with frequency information')
 
     if df2_out is None and target_freq is None:
         high_freq = auto_step_down_base_freq(low_freq)
@@ -162,12 +177,12 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     elif df2_out is not None and target_freq is not None:
         if df2_out.index.inferred_freq != target_freq:
             raise ValueError('User provided target_freq does not match frequency information found on indicator data '
-                             'df2.')
+                             'high_freq_df.')
         high_freq = target_freq
     else:
         high_freq = df2_out.index.inferred_freq
         if not high_freq:
-            raise ValueError('Indicator data df2 does not have a valid time index with frequency information')
+            raise ValueError('Indicator data high_freq_df does not have a valid time index with frequency information')
 
     validate_freqs(low_freq, high_freq)
 
@@ -187,8 +202,8 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
         df2_out = pd.Series(1, index=high_freq_idx, name=high_freq_name)
 
     elif df2_out is None:
-        raise ValueError('df2 can only be None for methods "denton" and "denton-cholette", otherwise a dataframe of'
-                         'high-frequency indicators must be provided.')
+        raise ValueError('high_freq_df can only be None for methods "denton" and "denton-cholette", otherwise a '
+                         'dataframe of high-frequency indicators must be provided.')
     df, C_mask = align_and_merge_dfs(df1_out, df2_out)
 
     return df, C_mask, time_conversion_factor
@@ -260,9 +275,15 @@ def disaggregate_series(low_freq_df,
         A Pandas Series object containing the interpolated high frequency data.
     """
 
-    assert method in ['denton', 'denton-cholette', 'chow-lin', 'litterman']
-    assert criterion in ['proportional', 'additive']
-    assert agg_func in ['mean', 'sum', 'first', 'last']
+    if isinstance(low_freq_df, pd.Series):
+        low_freq_df = low_freq_df.to_frame()
+
+    if method not in ['denton', 'denton-cholette', 'chow-lin', 'litterman']:
+        raise ValueError(f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}.")
+    if criterion not in ['proportional', 'additive']:
+        raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
+    if agg_func not in ['mean', 'sum', 'first', 'last']:
+        raise ValueError(f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}")
 
     target_column = target_column or low_freq_df.columns[0]
     target_idx = np.flatnonzero(low_freq_df.columns == target_column)[0]
