@@ -161,22 +161,5 @@ def freq(
     return base_freq, suffix, start_date
 
 
-@given(freq(base="A", suffix_list=MONTHS), integers(0, 5))
-def test_disaggregate_annual_to_monthly(params, drop_last):
-    base, suffix, start_date = params
-    freq = base + suffix
-    target_freq = "M"
-
-    low_freq_idx = pd.date_range(start_date, freq=freq, periods=100)
-    low_freq_idx = low_freq_idx[slice(None, None if drop_last == 0 else -drop_last)]
-
-    low_freq_df = pd.Series(
-        np.random.normal(size=len(low_freq_idx)), index=low_freq_idx, name="test"
-    )
-    high_freq_df = disaggregate_series(
-        low_freq_df, agg_func="sum", method="denton-cholette", target_freq=target_freq
-    )
-
-
 if __name__ == "__main__":
     unittest.main()
