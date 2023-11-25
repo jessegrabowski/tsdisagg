@@ -1,26 +1,33 @@
+import numpy as np
+import pandas as pd
 from scipy import linalg, stats
 from scipy.optimize import minimize
-import pandas as pd
-import numpy as np
 
-from tsdisagg.time_conversion import make_companion_index, auto_step_down_base_freq, validate_freqs, \
-    make_names_from_frequencies, align_and_merge_dfs, get_frequency_name, FREQ_CONVERSION_FACTORS
+from tsdisagg.time_conversion import (
+    FREQ_CONVERSION_FACTORS,
+    align_and_merge_dfs,
+    auto_step_down_base_freq,
+    get_frequency_name,
+    make_companion_index,
+    make_names_from_frequencies,
+    validate_freqs,
+)
 
 
-def build_conversion_matrix(n, nl, i_len, C_mask = None, agg_func='sum'):
+def build_conversion_matrix(n, nl, i_len, C_mask=None, agg_func="sum"):
     excess = n - i_len * nl
     extra_periods = int(np.ceil(excess / i_len))
 
     C_mask = C_mask or np.full(nl, True)
 
-    if agg_func == 'sum':
+    if agg_func == "sum":
         i = np.ones((i_len, 1))
-    elif agg_func == 'mean':
+    elif agg_func == "mean":
         i = np.ones((i_len, 1)) / i_len
-    elif agg_func == 'first':
+    elif agg_func == "first":
         i = np.zeros((i_len, 1))
         i[0] = 1
-    elif agg_func == 'last':
+    elif agg_func == "last":
         i = np.zeros((i_len, 1))
         i[-1] = 1
 
@@ -84,19 +91,19 @@ def f_minimize(params, y, X, C, f_cov):
     return -log_likelihood(nl, CΣCT, ul)
 
 
-def build_denton_covariance(n, C, X, h=1, criterion='proportional'):
+def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
     Δ = build_difference_matrix(n, h)
-    if criterion == 'proportional':
+    if criterion == "proportional":
         Δ = Δ @ np.diag(1 / X.ravel() / X.mean())
     Σ_D = np.linalg.solve(Δ.T @ Δ, np.eye(n))
 
     return Σ_D
 
 
-def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion='proportional'):
+def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="proportional"):
     # Here is the Charlotte correction: slice off the top h rows of the difference matrix
     Δ = build_difference_matrix(n, h)[h:, :]
-    if criterion == 'proportional':
+    if criterion == "proportional":
         Δ = Δ @ np.diag(1 / X.ravel() / X.mean())
     W_1 = np.r_[np.c_[Δ.T @ Δ, C.T], np.c_[C, np.zeros((nl, nl))]]
     W_2 = np.r_[np.c_[Δ.T @ Δ, np.zeros((n, nl))], np.c_[C, np.eye(nl)]]
@@ -109,9 +116,9 @@ def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion='prop
 
 
 def print_regression_report(y, X, params, std_β, C, method):
-    print(f'Dependent Variable: {y.name}')
+    print(f"Dependent Variable: {y.name}")
     print(f"GLS Estimates using {method.title()}'s covariance matrix")
-    print(f'N = {X.shape[0]}\t\tdf = {X.shape[0] - len(params)}')
+    print(f"N = {X.shape[0]}\t\tdf = {X.shape[0] - len(params)}")
     N, k = X.shape
     deg_f = N - len(params)
     t_dist = stats.t(df=deg_f)
@@ -120,11 +127,13 @@ def print_regression_report(y, X, params, std_β, C, method):
     r2 = 1 - np.var(ul) / (y.dropna() - y.mean()).var()
     adj_r2 = 1 - (1 - r2) * (N - 1) / (N - k - 1)
 
-    print(f'Adj r2 = {adj_r2:0.4f}')
-    print('')
+    print(f"Adj r2 = {adj_r2:0.4f}")
+    print("")
 
-    print(f'{"Variable":<15}{"coef":>10}{"sd err":>15}{"t":>15}{"P > |t|":>15}{"[0.025":>15}{"0.975]":>15}')
-    print('-' * 100)
+    print(
+        f'{"Variable":<15}{"coef":>10}{"sd err":>15}{"t":>15}{"P > |t|":>15}{"[0.025":>15}{"0.975]":>15}'
+    )
+    print("-" * 100)
     for i, var in enumerate(X.columns):
         t_05 = t_dist.ppf(1 - 0.05 / 2)
         ci_low = params[i] - std_β[i] * t_05
@@ -133,8 +142,9 @@ def print_regression_report(y, X, params, std_β, C, method):
         t_stat = params[i] / std_β[i]
         p_value = t_dist.sf(np.abs(t_stat))
         print(
-            f'{var:<15}{params[i]:>10.4f}{std_β[i]:>15.4f}{t_stat:>15.4f}{p_value:>15.4f}{ci_low:>15.4f}{ci_high:>15.4f}')
-    print('')
+            f"{var:<15}{params[i]:>10.4f}{std_β[i]:>15.4f}{t_stat:>15.4f}{p_value:>15.4f}{ci_low:>15.4f}{ci_high:>15.4f}"
+        )
+    print("")
     print(f'{"rho":<15}{params[-2]:>10.4f}')
     print(f'{"sigma.sq":<15}{params[-1]:>10.4f}')
 
@@ -143,24 +153,30 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     df1_out = df1.copy()
 
     if not isinstance(df1.index, pd.core.indexes.datetimes.DatetimeIndex):
-        raise ValueError('No datetime index found on the dataframe passed as argument to low_freq_df.')
+        raise ValueError(
+            "No datetime index found on the dataframe passed as argument to low_freq_df."
+        )
 
     if df1.isna().any().any():
-        raise ValueError('low_freq_df has missing values.')
+        raise ValueError("low_freq_df has missing values.")
 
     if df2 is not None:
         if not isinstance(df2.index, pd.core.indexes.datetimes.DatetimeIndex):
-            raise ValueError('No datetime index found on the dataframe passed as argument to low_freq_df.')
+            raise ValueError(
+                "No datetime index found on the dataframe passed as argument to low_freq_df."
+            )
 
         if df2.isna().any().any():
-            raise ValueError('high_freq_df has missing values.')
+            raise ValueError("high_freq_df has missing values.")
 
         if df2.index[0] > df1.index[0]:
-            raise ValueError(f'Start date found on high frequency data {df2.index[0]} is after start date found on '
-                             f'low frequency data {df1.index[0]}. Interpolation is not possible in this case, because '
-                             f'there is no observed high frequency data associated with the first '
-                             f'{(df1.index < df2.index[0]).sum()} low-frequency observations. '
-                             f'Align the start date of these two dataframes and try again.')
+            raise ValueError(
+                f"Start date found on high frequency data {df2.index[0]} is after start date found on "
+                f"low frequency data {df1.index[0]}. Interpolation is not possible in this case, because "
+                f"there is no observed high frequency data associated with the first "
+                f"{(df1.index < df2.index[0]).sum()} low-frequency observations. "
+                f"Align the start date of these two dataframes and try again."
+            )
 
         df2_out = df2.copy()
     else:
@@ -168,7 +184,9 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
 
     low_freq = df1_out.index.freq or df1_out.index.inferred_freq
     if not low_freq:
-        raise ValueError('Low frequency dataframe does not have a valid time index with frequency information')
+        raise ValueError(
+            "Low frequency dataframe does not have a valid time index with frequency information"
+        )
 
     if df2_out is None and target_freq is None:
         high_freq = auto_step_down_base_freq(low_freq)
@@ -176,13 +194,17 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
         high_freq = target_freq
     elif df2_out is not None and target_freq is not None:
         if df2_out.index.inferred_freq != target_freq:
-            raise ValueError('User provided target_freq does not match frequency information found on indicator data '
-                             'high_freq_df.')
+            raise ValueError(
+                "User provided target_freq does not match frequency information found on indicator data "
+                "high_freq_df."
+            )
         high_freq = target_freq
     else:
         high_freq = df2_out.index.inferred_freq
         if not high_freq:
-            raise ValueError('Indicator data high_freq_df does not have a valid time index with frequency information')
+            raise ValueError(
+                "Indicator data high_freq_df does not have a valid time index with frequency information"
+            )
 
     validate_freqs(low_freq, high_freq)
 
@@ -197,28 +219,32 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     elif isinstance(df1_out, pd.DataFrame):
         df1_out.rename(columns={var_name: low_freq_name}, inplace=True)
 
-    if df2_out is None and method in ['denton', 'denton-cholette']:
+    if df2_out is None and method in ["denton", "denton-cholette"]:
         high_freq_idx = make_companion_index(df1_out, target_freq=high_freq)
         df2_out = pd.Series(1, index=high_freq_idx, name=high_freq_name)
 
     elif df2_out is None:
-        raise ValueError('high_freq_df can only be None for methods "denton" and "denton-cholette", otherwise a '
-                         'dataframe of high-frequency indicators must be provided.')
+        raise ValueError(
+            'high_freq_df can only be None for methods "denton" and "denton-cholette", otherwise a '
+            "dataframe of high-frequency indicators must be provided."
+        )
     df, C_mask = align_and_merge_dfs(df1_out, df2_out)
 
     return df, C_mask, time_conversion_factor
 
 
-def disaggregate_series(low_freq_df,
-                        high_freq_df=None,
-                        target_freq=None,
-                        target_column=None,
-                        agg_func='sum',
-                        method='denton-cholette',
-                        criterion='proportional',
-                        h=1,
-                        optimizer_kwargs=None,
-                        verbose=True):
+def disaggregate_series(
+    low_freq_df,
+    high_freq_df=None,
+    target_freq=None,
+    target_column=None,
+    agg_func="sum",
+    method="denton-cholette",
+    criterion="proportional",
+    h=1,
+    optimizer_kwargs=None,
+    verbose=True,
+):
 
     """
     Transform a low frequency time series into a higher frequency series, preserving certain statistics aggregate
@@ -278,17 +304,23 @@ def disaggregate_series(low_freq_df,
     if isinstance(low_freq_df, pd.Series):
         low_freq_df = low_freq_df.to_frame()
 
-    if method not in ['denton', 'denton-cholette', 'chow-lin', 'litterman']:
-        raise ValueError(f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}.")
-    if criterion not in ['proportional', 'additive']:
+    if method not in ["denton", "denton-cholette", "chow-lin", "litterman"]:
+        raise ValueError(
+            f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}."
+        )
+    if criterion not in ["proportional", "additive"]:
         raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
-    if agg_func not in ['mean', 'sum', 'first', 'last']:
-        raise ValueError(f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}")
+    if agg_func not in ["mean", "sum", "first", "last"]:
+        raise ValueError(
+            f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}"
+        )
 
     target_column = target_column or low_freq_df.columns[0]
     target_idx = np.flatnonzero(low_freq_df.columns == target_column)[0]
 
-    df, C_mask, time_conversion_factor = prepare_input_dataframes(low_freq_df, high_freq_df, target_freq, method)
+    df, C_mask, time_conversion_factor = prepare_input_dataframes(
+        low_freq_df, high_freq_df, target_freq, method
+    )
 
     y = df.iloc[:, target_idx].dropna().values
     X = df.drop(columns=df.columns[target_idx]).values
@@ -297,35 +329,37 @@ def disaggregate_series(low_freq_df,
     nl = y.shape[0]
 
     C = build_conversion_matrix(n, nl, time_conversion_factor, agg_func=agg_func, C_mask=C_mask)
-    if method == 'denton':
+    if method == "denton":
         assert k == 1
         Σ = build_denton_covariance(n, C, X, h, criterion)
         D = build_distribution_matrix(Σ, C)
         p = X.ravel()
 
-    elif method == 'denton-cholette':
+    elif method == "denton-cholette":
         assert k == 1
         D = build_denton_charlotte_distribution_matrix(n, nl, C, X, h, criterion)
         p = X.ravel()
 
     else:
         if optimizer_kwargs is None:
-            optimizer_kwargs = {'method': 'nelder-mead'}
-        if optimizer_kwargs and 'method' not in optimizer_kwargs.keys():
-            optimizer_kwargs.update({'method': 'nelder-mead'})
+            optimizer_kwargs = {"method": "nelder-mead"}
+        if optimizer_kwargs and "method" not in optimizer_kwargs.keys():
+            optimizer_kwargs.update({"method": "nelder-mead"})
 
-        if method == 'chow-lin':
+        if method == "chow-lin":
             f_cov = build_chao_lin_covariance
-        elif method == 'litterman':
+        elif method == "litterman":
             f_cov = build_litterman_covariance
         else:
-            raise ValueError(f'Method {method} not supported.')
+            raise ValueError(f"Method {method} not supported.")
 
         # betas are unbounded, bound rho between 0 and 1 and sigma between 0 and +inf
         bounds = [(1e-5, 1 - 1e-5), (1e-5, None)]
 
         x0 = np.full(2, 0.8)
-        result = minimize(f_minimize, x0=x0, args=(y, X, C, f_cov), bounds=bounds, **optimizer_kwargs)
+        result = minimize(
+            f_minimize, x0=x0, args=(y, X, C, f_cov), bounds=bounds, **optimizer_kwargs
+        )
 
         ρ, sigma_e_sq = result.x
         Σ = f_cov(ρ, sigma_e_sq, n)
@@ -335,7 +369,9 @@ def disaggregate_series(low_freq_df,
         std_β = np.sqrt(np.diagonal(np.linalg.solve(X.T @ Σ_inv @ X, np.eye(k))))
 
         if verbose:
-            print_regression_report(df.iloc[:, 0], df.iloc[:, 1:], np.r_[β, ρ, sigma_e_sq], std_β, C, method)
+            print_regression_report(
+                df.iloc[:, 0], df.iloc[:, 1:], np.r_[β, ρ, sigma_e_sq], std_β, C, method
+            )
 
         p = X @ β
         D = build_distribution_matrix(Σ, C)
