@@ -151,6 +151,7 @@ def print_regression_report(y, X, params, std_β, C, method):
 
 def prepare_input_dataframes(df1, df2, target_freq, method):
     df1_out = df1.copy()
+    no_high_freq_data = df2 is None
 
     if not isinstance(df1.index, pd.core.indexes.datetimes.DatetimeIndex):
         raise ValueError(
@@ -228,7 +229,10 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
             'high_freq_df can only be None for methods "denton" and "denton-cholette", otherwise a '
             "dataframe of high-frequency indicators must be provided."
         )
+
     df, C_mask = align_and_merge_dfs(df1_out, df2_out)
+    if no_high_freq_data:
+        C_mask = None
 
     return df, C_mask, time_conversion_factor
 

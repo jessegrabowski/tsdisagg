@@ -1,9 +1,15 @@
+import calendar
 import unittest
+from typing import Callable, List, Tuple
 
+import numpy as np
 import pandas as pd
 import pandas.testing as pd_testing
+from hypothesis import given
+from hypothesis.strategies import SearchStrategy, composite, integers
 
 from tsdisagg import disaggregate_series
+from tsdisagg.time_conversion import MONTHS
 
 
 class DisaggregationTests(unittest.TestCase):
@@ -128,6 +134,48 @@ class DisaggregationTests(unittest.TestCase):
         )
 
         self.assertEqual(expected, sales_m_litterman.to_frame())
+
+
+@composite
+def freq(
+    draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]
+) -> Tuple[str, str, str]:
+    bases = [f"{base}"] if base == "A" else [f"B{base}", f"{base}S", f"B{base}S"]
+    suffixes = [""] if base == "M" else [f"-{x}" for x in suffix_list] + [""]
+
+    n_bases = len(bases) - 1
+    n_suffixes = len(suffixes) - 1
+
+    base_idx = draw(integers(min_value=0, max_value=n_bases))
+    suffix_idx = draw(integers(min_value=0, max_value=n_suffixes))
+
+    year = draw(integers(min_value=1900, max_value=2000))
+    month = draw(integers(min_value=1, max_value=12))
+    day = draw(integers(min_value=1, max_value=calendar.monthrange(year, month)[1]))
+
+    start_date = f"{year}-{month}-{day}"
+
+    base_freq = bases[base_idx]
+    suffix = suffixes[suffix_idx]
+
+    return base_freq, suffix, start_date
+
+
+@given(freq(base="A", suffix_list=MONTHS), integers(0, 5))
+def test_disaggregate_annual_to_monthly(params, drop_last):
+    base, suffix, start_date = params
+    freq = base + suffix
+    target_freq = "M"
+
+    low_freq_idx = pd.date_range(start_date, freq=freq, periods=100)
+    low_freq_idx = low_freq_idx[slice(None, None if drop_last == 0 else -drop_last)]
+
+    low_freq_df = pd.Series(
+        np.random.normal(size=len(low_freq_idx)), index=low_freq_idx, name="test"
+    )
+    high_freq_df = disaggregate_series(
+        low_freq_df, agg_func="sum", method="denton-cholette", target_freq=target_freq
+    )
 
 
 if __name__ == "__main__":

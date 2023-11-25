@@ -74,6 +74,24 @@ class TestPandasIndex(unittest.TestCase):
 
         self.assertEqual(df.shape[0], result.shape[0])
 
+    def test_dataframe_merge_Q_to_M(self):
+        freq = "QS"
+        target_freq = "MS"
+        start_date = "1900-01-01"
+
+        low_freq_df = pd.Series(
+            1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"
+        ).iloc[:-2]
+
+        index = make_companion_index(low_freq_df, target_freq)
+        low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
+
+        high_freq_df = pd.Series(1, index=index, name=high_freq_name)
+        result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
+
+        df, C_mask, factor = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
+        self.assertEqual(df.shape[0], result.shape[0])
+
 
 if __name__ == "__main__":
     unittest.main()
