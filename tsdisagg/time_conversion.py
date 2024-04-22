@@ -1,14 +1,14 @@
 import pandas as pd
 
 MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
-YEARLY_FREQS = ["A", "BA", "AS", "BAS"]
-QUARTERLY_FREQS = ["Q", "BQ", "QS", "BQS"]
+YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
+QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
 VALID_YEARLY = YEARLY_FREQS + [f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS]
 VALID_QUARTERLY = QUARTERLY_FREQS + [
     f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS
 ]
-VALID_MONTHLY = ["M", "MS", "BM", "BMS"]
+VALID_MONTHLY = ["ME", "MS", "BME", "BMS"]
 
 MONTHS_IN_YEAR = 12
 MONTHS_IN_QUARTER = 3
@@ -27,7 +27,7 @@ OFFSET_CONVERSIONS = {
     "quarterly": {"monthly": {"months": MONTHS_IN_QUARTER - 1}},
 }
 
-LONG_FREQ_TO_CODE = {"yearly": "A", "quarterly": "Q", "monthly": "M"}
+LONG_FREQ_TO_CODE = {"yearly": "Y", "quarterly": "Q", "monthly": "M"}
 CODE_TO_LONG_FREQ = {v: k for k, v in LONG_FREQ_TO_CODE.items()}
 
 FREQ_TO_ORDER = {"yearly": 10, "quarterly": 9, "monthly": 8}
@@ -66,7 +66,7 @@ def get_frequency_name(freq):
     if is_monthly_freq(freq):
         return "monthly"
 
-    return ""
+    raise ValueError(f"Invalid frequency {freq}")
 
 
 def auto_step_down_base_freq(freq):

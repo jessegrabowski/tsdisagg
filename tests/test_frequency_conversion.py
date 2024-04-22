@@ -15,7 +15,7 @@ def freq(
     draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]
 ) -> Tuple[str, str, str]:
 
-    bases = [f"B{base}", f"{base}S", f"B{base}S"]
+    bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
     suffixes = [f"-{x}" for x in suffix_list] + [""]
 
     n_bases = len(bases) - 1
@@ -37,11 +37,11 @@ def freq(
 
 
 class TestPandasIndex(unittest.TestCase):
-    @given(freq(base="A", suffix_list=MONTHS))
+    @given(freq(base="Y", suffix_list=MONTHS))
     def test_dataframe_merge(self, params):
         base, suffix, start_date = params
         freq = base + suffix
-        target_freq = base.replace("A", "Q") + suffix
+        target_freq = base.replace("Y", "Q") + suffix
 
         low_freq_df = pd.Series(
             1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"
@@ -55,11 +55,11 @@ class TestPandasIndex(unittest.TestCase):
         df, _, _ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
         self.assertEqual(df.shape[0], result.shape[0])
 
-    @given(freq(base="A", suffix_list=MONTHS))
+    @given(freq(base="Y", suffix_list=MONTHS))
     def test_dataframe_merge_A_to_M(self, params):
         base, suffix, start_date = params
         freq = base + suffix
-        target_freq = base.replace("A", "M")
+        target_freq = base.replace("Y", "M")
 
         low_freq_df = pd.Series(
             1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"

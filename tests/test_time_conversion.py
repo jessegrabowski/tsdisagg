@@ -19,8 +19,8 @@ def freq(
     draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]
 ) -> Tuple[str, str, bool]:
 
-    bases = [f"B{base}", f"{base}S", f"B{base}S"]
-    suffixes = [f"-{x}" for x in suffix_list] + [""]
+    bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
+    suffixes = [f"-{x}" for x in suffix_list]
 
     n_bases = len(bases) - 1
     n_suffixes = len(suffixes) - 1
@@ -33,7 +33,7 @@ def freq(
 
 
 class TestCompanionIndex(unittest.TestCase):
-    @given(freq(base="A", suffix_list=MONTHS))
+    @given(freq(base="Y", suffix_list=MONTHS))
     def test_yearly_dataframe_to_monthly(self, params):
         base, suffix, test_df = params
         freq = base + suffix
@@ -44,7 +44,7 @@ class TestCompanionIndex(unittest.TestCase):
 
         T = df.shape[0]
 
-        target_freq = base.replace("A", "M")
+        target_freq = base.replace("Y", "M")
         index = make_companion_index(df, target_freq)
         low_freq_name, high_freq_name = get_frequency_names(df, target_freq)
 
@@ -58,7 +58,7 @@ class TestCompanionIndex(unittest.TestCase):
         block_matrix = result.values[:, 0].reshape(T, 12)
         self.assertEqual(np.all(np.isnan(block_matrix).sum(axis=1) == 11), True)
 
-    @given(freq(base="A", suffix_list=MONTHS))
+    @given(freq(base="Y", suffix_list=MONTHS))
     def test_yearly_to_quarterly(self, params):
         base, suffix, test_df = params
         freq = base + suffix
@@ -69,7 +69,7 @@ class TestCompanionIndex(unittest.TestCase):
 
         T = df.shape[0]
 
-        target_freq = base.replace("A", "Q") + suffix
+        target_freq = base.replace("Y", "Q") + suffix
         index = make_companion_index(df, target_freq)
         self.assertEqual(target_freq, index.freq)
 
@@ -109,14 +109,14 @@ class TestCompanionIndex(unittest.TestCase):
 
 class TestUtilities(unittest.TestCase):
     def test_step_down_frequency(self):
-        freq = "AS-JAN"
+        freq = "YS-JAN"
 
         auto_freq = auto_step_down_base_freq(freq)
         self.assertEqual(auto_freq, "QS-JAN")
 
-        freq = "BQ-MAR"
+        freq = "BQE-MAR"
         auto_freq = auto_step_down_base_freq(freq)
-        self.assertEqual(auto_freq, "BM")
+        self.assertEqual(auto_freq, "BME")
 
         freq = "MS"
         self.assertRaises(NotImplementedError, auto_step_down_base_freq, freq)
