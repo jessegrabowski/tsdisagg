@@ -61,6 +61,22 @@ class DisaggregationTests(unittest.TestCase):
 
         self.assertEqual(expected, sales_q_chow_lin.to_frame())
 
+    def test_chow_lin_Q_to_M(self):
+        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM.csv", index_col=0)
+        expected.index = self.imports_q.index
+        expected.columns = ["sales"]
+
+        sales_m_chow_lin = disaggregate_series(
+            self.imports_q,
+            self.exports_m.assign(constant=1),
+            method="chow-lin",
+            agg_func="sum",
+            optimizer_kwargs={"method": "powell"},
+            verbose=False,
+        )
+
+        self.assertEqual(expected, sales_m_chow_lin.to_frame())
+
     def test_chow_lin_two_indicator(self):
         expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
         expected.index = self.exports_q.index
@@ -134,6 +150,7 @@ class DisaggregationTests(unittest.TestCase):
         )
 
         self.assertEqual(expected, sales_m_litterman.to_frame())
+
 
 
 @composite
