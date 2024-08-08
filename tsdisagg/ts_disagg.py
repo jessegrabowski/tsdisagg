@@ -1,3 +1,5 @@
+from functools import partial
+
 import numpy as np
 import pandas as pd
 from scipy import linalg, stats
@@ -84,7 +86,7 @@ def f_minimize(params, y, X, C, f_cov):
     mu = C @ p
     cov = C @ Σ @ C.T
 
-    return -multivariate_normal.logpdf(y, mu, cov)
+    return -multivariate_normal.logpdf(y, mu, cov) / n
 
 
 def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
@@ -362,15 +364,14 @@ def disaggregate_series(
         bounds = [(None, None)] * k + [(1e-5, 1 - 1e-5), (1e-5, None)]
 
         x0 = np.full(2 + k, 0.8)
-        optimizer_result = minimize(
-            f_minimize, x0=x0, args=(y, X, C, f_cov), bounds=bounds, **optimizer_kwargs
-        )
+        objective = partial(f_minimize, y=y, X=X, C=C, f_cov=f_cov)
+
+        optimizer_result = minimize(objective, x0=x0, bounds=bounds, **optimizer_kwargs)
 
         *betas, ρ, sigma_e_sq = optimizer_result.x
         β = np.stack(betas)
         Σ = f_cov(ρ, sigma_e_sq, n)
         Σ_inv_X = np.linalg.solve(Σ, X)
-
         std_β = np.sqrt(np.diagonal(X.T @ Σ_inv_X))
 
         if verbose:
