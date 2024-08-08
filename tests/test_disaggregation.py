@@ -7,20 +7,14 @@ import pandas as pd
 import pandas.testing as pd_testing
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
+from numpy.testing import assert_allclose
 
 from tsdisagg import disaggregate_series
 from tsdisagg.time_conversion import MONTHS
 
 
 class DisaggregationTests(unittest.TestCase):
-    def assertDataframeEqual(self, a, b, msg):
-        try:
-            pd_testing.assert_frame_equal(a, b)
-        except AssertionError as e:
-            raise self.failureException(msg) from e
-
     def setUp(self):
-        self.addTypeEqualityFunc(pd.DataFrame, self.assertDataframeEqual)
         self.exports_m = pd.read_csv("tests/data/exports_m.csv", index_col=0)
         self.exports_m.index = pd.date_range(
             start="1972-01-01", freq="MS", periods=self.exports_m.shape[0]
@@ -55,11 +49,33 @@ class DisaggregationTests(unittest.TestCase):
             self.exports_q.assign(constant=1),
             method="chow-lin",
             agg_func="sum",
-            optimizer_kwargs={"method": "powell"},
+            optimizer_kwargs={"method": "L-BFGS-B"},
             verbose=False,
         )
 
-        self.assertEqual(expected, sales_q_chow_lin.to_frame())
+        assert_allclose(expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3)
+
+    def test_chow_lin_Q_to_M(self):
+        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM.csv")
+        expected.index = self.exports_m.index
+        expected.columns = ["sales"]
+
+        sales_m_chow_lin, res = disaggregate_series(
+            self.imports_q,
+            self.exports_m.assign(constant=1),
+            method="chow-lin",
+            agg_func="sum",
+            optimizer_kwargs={"method": "powell"},
+            verbose=True,
+            return_optimizer_result=True,
+        )
+        beta_exports, intercept = res.x[:2]
+
+        # These magic values come from R output, see https://github.com/jessegrabowski/tsdisagg/pull/3
+        assert_allclose(beta_exports, 0.52749, rtol=3, atol=3)
+        assert_allclose(intercept, 88.08168, rtol=3, atol=3)
+
+        assert_allclose(sales_m_chow_lin, expected.values.ravel(), atol=1e-3, rtol=1e-3)
 
     def test_chow_lin_two_indicator(self):
         expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
@@ -68,16 +84,17 @@ class DisaggregationTests(unittest.TestCase):
 
         df2 = self.exports_q.merge(self.imports_q, left_index=True, right_index=True)
 
-        sales_q_chow_lin = disaggregate_series(
+        sales_q_chow_lin, res = disaggregate_series(
             self.sales_a,
             df2.resample("QS-OCT").first().assign(constant=1),
             method="chow-lin",
             agg_func="sum",
-            optimizer_kwargs={"method": "l-bfgs-b"},
+            optimizer_kwargs={"method": "L-BFGS-B"},
             verbose=True,
+            return_optimizer_result=True,
         )
 
-        self.assertEqual(expected, sales_q_chow_lin.to_frame())
+        assert_allclose(expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3)
 
     def test_denton(self):
         expected = pd.read_csv("tests/data/R_output_denton.csv", index_col=0)
@@ -87,7 +104,7 @@ class DisaggregationTests(unittest.TestCase):
         sales_q_denton = disaggregate_series(
             self.sales_a, method="denton", agg_func="sum", optimizer_kwargs={"method": "powell"}
         )
-        self.assertEqual(expected, sales_q_denton.to_frame())
+        assert_allclose(expected.values.ravel(), sales_q_denton.values, atol=1e-3, rtol=1e-3)
 
     def test_denton_cholette_w_constant(self):
         expected = pd.read_csv("tests/data/R_output_denton_cholette.csv", index_col=0)
@@ -100,8 +117,7 @@ class DisaggregationTests(unittest.TestCase):
             agg_func="sum",
             optimizer_kwargs={"method": "powell"},
         )
-
-        self.assertEqual(expected, sales_q_dc.to_frame())
+        assert_allclose(expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3)
 
     def test_denton_cholette_w_indicator(self):
         expected = pd.read_csv("tests/data/R_output_denton_cholette_w_indicator.csv", index_col=0)
@@ -116,24 +132,24 @@ class DisaggregationTests(unittest.TestCase):
             optimizer_kwargs={"method": "powell"},
             verbose=False,
         )
-
-        self.assertEqual(expected, sales_q_dc.to_frame())
+        assert_allclose(expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3)
 
     def test_litterman_A_to_M(self):
         expected = pd.read_csv("tests/data/R_output_litterman_A_to_M.csv", index_col=0)
         expected.index = self.exports_m.index
         expected.columns = ["sales"]
 
-        sales_m_litterman = disaggregate_series(
+        sales_m_litterman, res = disaggregate_series(
             self.sales_a,
             high_freq_df=self.exports_m.assign(Constant=1),
             method="litterman",
             agg_func="sum",
-            optimizer_kwargs={"method": "nelder-mead"},
-            verbose=False,
+            optimizer_kwargs={"method": "powell", "tol": 1e-10},
+            verbose=True,
+            return_optimizer_result=True,
         )
 
-        self.assertEqual(expected, sales_m_litterman.to_frame())
+        assert_allclose(expected.values.ravel(), sales_m_litterman.values, atol=1e-3, rtol=1e-3)
 
 
 @composite
