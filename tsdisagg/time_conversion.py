@@ -1,10 +1,25 @@
 import pandas as pd
 
-MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+MONTHS = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+]
 YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
 QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
-VALID_YEARLY = YEARLY_FREQS + [f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS]
+VALID_YEARLY = YEARLY_FREQS + [
+    f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS
+]
 VALID_QUARTERLY = QUARTERLY_FREQS + [
     f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS
 ]
@@ -78,7 +93,9 @@ def auto_step_down_base_freq(freq):
     high_freq_name = ORDER_TO_FREQ.get(one_freq_down)
 
     if not high_freq_name:
-        raise NotImplementedError(f"No frequency lower than {freq_name} currently supported")
+        raise NotImplementedError(
+            f"No frequency lower than {freq_name} currently supported"
+        )
 
     low_freq_code = LONG_FREQ_TO_CODE[freq_name]
     high_freq_code = LONG_FREQ_TO_CODE[high_freq_name]
@@ -248,7 +265,7 @@ def handle_endpoint_differences(low_freq_df, high_freq_df):
 
     # With quarter, full_set will always be [1, 2, 3, 4]
     # Doing this will let "C_mask = C_mask or np.full(nl, True)" in ts_disagg.py/build_conversion_matrix() to do np.full(nl, True), solve the issue
-    if(attr == "quarter"):
+    if attr == "quarter":
         C_mask = None
         return C_mask
 
@@ -265,6 +282,8 @@ def handle_endpoint_differences(low_freq_df, high_freq_df):
 
 def align_and_merge_dfs(low_freq_df, high_freq_df):
     C_mask = handle_endpoint_differences(low_freq_df, high_freq_df)
-    df = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
+    df = pd.merge(
+        low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
+    )
 
     return df, C_mask

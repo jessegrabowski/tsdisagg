@@ -1,16 +1,14 @@
 import calendar
 import unittest
+
 from typing import Callable, List, Tuple
 
-import numpy as np
 import pandas as pd
-import pandas.testing as pd_testing
-from hypothesis import given
+
 from hypothesis.strategies import SearchStrategy, composite, integers
 from numpy.testing import assert_allclose
 
 from tsdisagg import disaggregate_series
-from tsdisagg.time_conversion import MONTHS
 
 
 class DisaggregationTests(unittest.TestCase):
@@ -53,7 +51,9 @@ class DisaggregationTests(unittest.TestCase):
             verbose=False,
         )
 
-        assert_allclose(expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3
+        )
 
     def test_chow_lin_Q_to_M(self):
         expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM.csv")
@@ -78,7 +78,9 @@ class DisaggregationTests(unittest.TestCase):
         assert_allclose(sales_m_chow_lin, expected.values.ravel(), atol=1e-3, rtol=1e-3)
 
     def test_chow_lin_two_indicator(self):
-        expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
+        expected = pd.read_csv(
+            "tests/data/R_output_chow_lin_two_indicator.csv", index_col=0
+        )
         expected.index = self.exports_q.index
         expected.columns = ["sales"]
 
@@ -94,7 +96,9 @@ class DisaggregationTests(unittest.TestCase):
             return_optimizer_result=True,
         )
 
-        assert_allclose(expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_q_chow_lin.values, atol=1e-3, rtol=1e-3
+        )
 
     def test_denton(self):
         expected = pd.read_csv("tests/data/R_output_denton.csv", index_col=0)
@@ -102,9 +106,14 @@ class DisaggregationTests(unittest.TestCase):
         expected.columns = ["sales"]
 
         sales_q_denton = disaggregate_series(
-            self.sales_a, method="denton", agg_func="sum", optimizer_kwargs={"method": "powell"}
+            self.sales_a,
+            method="denton",
+            agg_func="sum",
+            optimizer_kwargs={"method": "powell"},
         )
-        assert_allclose(expected.values.ravel(), sales_q_denton.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_q_denton.values, atol=1e-3, rtol=1e-3
+        )
 
     def test_denton_cholette_w_constant(self):
         expected = pd.read_csv("tests/data/R_output_denton_cholette.csv", index_col=0)
@@ -117,10 +126,14 @@ class DisaggregationTests(unittest.TestCase):
             agg_func="sum",
             optimizer_kwargs={"method": "powell"},
         )
-        assert_allclose(expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3
+        )
 
     def test_denton_cholette_w_indicator(self):
-        expected = pd.read_csv("tests/data/R_output_denton_cholette_w_indicator.csv", index_col=0)
+        expected = pd.read_csv(
+            "tests/data/R_output_denton_cholette_w_indicator.csv", index_col=0
+        )
         expected.index = self.exports_q.index
         expected.columns = ["sales"]
 
@@ -132,7 +145,9 @@ class DisaggregationTests(unittest.TestCase):
             optimizer_kwargs={"method": "powell"},
             verbose=False,
         )
-        assert_allclose(expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_q_dc.values, atol=1e-3, rtol=1e-3
+        )
 
     def test_litterman_A_to_M(self):
         expected = pd.read_csv("tests/data/R_output_litterman_A_to_M.csv", index_col=0)
@@ -149,7 +164,9 @@ class DisaggregationTests(unittest.TestCase):
             return_optimizer_result=True,
         )
 
-        assert_allclose(expected.values.ravel(), sales_m_litterman.values, atol=1e-3, rtol=1e-3)
+        assert_allclose(
+            expected.values.ravel(), sales_m_litterman.values, atol=1e-3, rtol=1e-3
+        )
 
 
 @composite
