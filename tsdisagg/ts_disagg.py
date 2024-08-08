@@ -2,6 +2,7 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
+
 from scipy import linalg, stats
 from scipy.optimize import OptimizeResult, minimize
 from scipy.stats import multivariate_normal
@@ -98,7 +99,9 @@ def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
     return Σ_D
 
 
-def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="proportional"):
+def build_denton_charlotte_distribution_matrix(
+    n, nl, C, X, h=1, criterion="proportional"
+):
     # Here is the Charlotte correction: slice off the top h rows of the difference matrix
     Δ = build_difference_matrix(n, h)[h:, :]
     if criterion == "proportional":
@@ -108,7 +111,7 @@ def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="prop
     W = np.linalg.solve(W_1, W_2)
 
     w_theta = W[:n, n:]
-    w_gamma = W[n:, n:]
+    W[n:, n:]
 
     return w_theta
 
@@ -211,7 +214,9 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     low_name = get_frequency_name(low_freq)
     time_conversion_factor = FREQ_CONVERSION_FACTORS[low_name][high_name]
 
-    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(df1_out, high_freq)
+    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(
+        df1_out, high_freq
+    )
 
     if isinstance(df1_out, pd.Series):
         df1_out.name = low_freq_name
@@ -248,7 +253,6 @@ def disaggregate_series(
     verbose=True,
     return_optimizer_result=False,
 ) -> pd.Series | tuple[pd.Series, OptimizeResult]:
-
     """
     Transform a low frequency time series into a higher frequency series, preserving certain statistics aggregate
     statistics.
@@ -299,6 +303,7 @@ def disaggregate_series(
         regression results to report.
     return_optimizer_result: bool, default False
         If True, return the OptimizerResult from ``scipy.optimize.minimize`. Useful for debugging.
+
     Returns
     -------
     high_freq_df: Series
@@ -316,7 +321,9 @@ def disaggregate_series(
             f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}."
         )
     if criterion not in ["proportional", "additive"]:
-        raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
+        raise ValueError(
+            f"Criterion should be one of 'proportional', 'additive'. Got {criterion}"
+        )
     if agg_func not in ["mean", "sum", "first", "last"]:
         raise ValueError(
             f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}"
@@ -335,7 +342,9 @@ def disaggregate_series(
     n, k = X.shape
     nl = y.shape[0]
 
-    C = build_conversion_matrix(n, nl, time_conversion_factor, agg_func=agg_func, C_mask=C_mask)
+    C = build_conversion_matrix(
+        n, nl, time_conversion_factor, agg_func=agg_func, C_mask=C_mask
+    )
     if method == "denton":
         assert k == 1
         Σ = build_denton_covariance(n, C, X, h, criterion)
