@@ -7,6 +7,7 @@ import pandas as pd
 import pandas.testing as pd_testing
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
+from numpy.testing import assert_allclose
 
 from tsdisagg import disaggregate_series
 from tsdisagg.time_conversion import MONTHS
@@ -62,21 +63,26 @@ class DisaggregationTests(unittest.TestCase):
         self.assertEqual(expected, sales_q_chow_lin.to_frame())
 
     def test_chow_lin_Q_to_M(self):
-        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM.csv", index_col=0)
-        expected.index = self.imports_q.index
+        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM.csv")
+        expected.index = self.exports_m.index
         expected.columns = ["sales"]
 
-        sales_m_chow_lin = disaggregate_series(
+        sales_m_chow_lin, res = disaggregate_series(
             self.imports_q,
             self.exports_m.assign(constant=1),
             method="chow-lin",
             agg_func="sum",
             optimizer_kwargs={"method": "powell"},
-            verbose=False,
+            verbose=True,
+            return_optimizer_result=True,
         )
+        beta_exports, intercept = res.x[:2]
 
-        self.assertEqual(expected, sales_m_chow_lin.to_frame())
+        # These magic values come from R output, see https://github.com/jessegrabowski/tsdisagg/pull/3
+        assert_allclose(beta_exports, 0.52749, rtol=3, atol=3)
+        assert_allclose(intercept, 88.08168, rtol=3, atol=3)
 
+        assert_allclose(sales_m_chow_lin, expected.values.ravel(), atol=1e-3, rtol=1e-3)
 
     def test_chow_lin_two_indicator(self):
         expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)

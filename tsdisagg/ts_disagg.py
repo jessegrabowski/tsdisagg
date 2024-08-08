@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy import linalg, stats
-from scipy.optimize import minimize
+from scipy.optimize import OptimizeResult, minimize
+from scipy.stats import multivariate_normal
 
 from tsdisagg.time_conversion import (
     FREQ_CONVERSION_FACTORS,
@@ -37,12 +38,6 @@ def build_conversion_matrix(n, nl, i_len, C_mask=None, agg_func="sum"):
     return C
 
 
-def log_likelihood(nl, CΣCT, ul):
-    sign, log_det = np.linalg.slogdet(CΣCT)
-
-    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (log_det + ul.T @ np.linalg.solve(CΣCT, ul))
-
-
 def build_difference_matrix(n, h=0):
     Δ = np.eye(n)
     Δ[np.where(np.eye(n, k=-1))] = -1
@@ -57,7 +52,7 @@ def build_chao_lin_covariance(rho, sigma_e_sq, n):
     row = rho ** np.arange(n)
     Σ_CL = np.r_[[np.r_[np.zeros(n - i), row[:i]] for i in range(n, 0, -1)]]
     Σ_CL += Σ_CL.T - np.eye(n)
-    Σ_CL *= sigma_e_sq / (1 - rho)
+    Σ_CL *= sigma_e_sq / (1 - rho**2)
     return Σ_CL
 
 
@@ -69,7 +64,7 @@ def build_litterman_covariance(rho, sigma_e_sq, n):
 
 
 def GLS_beta_hat(Σ, y, X, C, nl):
-    CΣCT_inv = np.linalg.solve(C @ Σ @ C.T, np.eye(nl))
+    CΣCT_inv = np.linalg.inv(C @ Σ @ C.T)
     A = X.T @ C.T @ CΣCT_inv @ C @ X
     B = X.T @ C.T @ CΣCT_inv @ y
     β = np.linalg.solve(A, B)
@@ -79,16 +74,17 @@ def GLS_beta_hat(Σ, y, X, C, nl):
 
 def f_minimize(params, y, X, C, f_cov):
     n, k = X.shape
-    nl = y.shape[0]
 
-    ρ, sigma_e_sq = params
+    *betas, ρ, sigma_e_sq = params
+    β = np.stack(betas)
     Σ = f_cov(ρ, sigma_e_sq, n)
-    β = GLS_beta_hat(Σ, y, X, C, nl)
 
     p = X @ β
-    ul = y - C @ p
-    CΣCT = C @ Σ @ C.T
-    return -log_likelihood(nl, CΣCT, ul)
+
+    mu = C @ p
+    cov = C @ Σ @ C.T
+
+    return -multivariate_normal.logpdf(y, mu, cov)
 
 
 def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
@@ -248,7 +244,8 @@ def disaggregate_series(
     h=1,
     optimizer_kwargs=None,
     verbose=True,
-):
+    return_optimizer_result=False,
+) -> pd.Series | tuple[pd.Series, OptimizeResult]:
 
     """
     Transform a low frequency time series into a higher frequency series, preserving certain statistics aggregate
@@ -298,12 +295,16 @@ def disaggregate_series(
     verbose: bool, default True
         Whether to print regression results. Ignored if method is "denton" or "denton-cholette", as these have no
         regression results to report.
-
+    return_optimizer_result: bool, default False
+        If True, return the OptimizerResult from ``scipy.optimize.minimize`. Useful for debugging.
     Returns
     -------
     high_freq_df: Series
         A Pandas Series object containing the interpolated high frequency data.
+    optimizer_result: OptimizeResult
+        Results object returned by ``scipy.optimize.minimze``. Only returned if ``return_optimizer_result = True``.
     """
+    optimizer_result = None
 
     if isinstance(low_freq_df, pd.Series):
         low_freq_df = low_freq_df.to_frame()
@@ -358,19 +359,19 @@ def disaggregate_series(
             raise ValueError(f"Method {method} not supported.")
 
         # betas are unbounded, bound rho between 0 and 1 and sigma between 0 and +inf
-        bounds = [(1e-5, 1 - 1e-5), (1e-5, None)]
+        bounds = [(None, None)] * k + [(1e-5, 1 - 1e-5), (1e-5, None)]
 
-        x0 = np.full(2, 0.8)
-        result = minimize(
+        x0 = np.full(2 + k, 0.8)
+        optimizer_result = minimize(
             f_minimize, x0=x0, args=(y, X, C, f_cov), bounds=bounds, **optimizer_kwargs
         )
 
-        ρ, sigma_e_sq = result.x
+        *betas, ρ, sigma_e_sq = optimizer_result.x
+        β = np.stack(betas)
         Σ = f_cov(ρ, sigma_e_sq, n)
-        Σ_inv = np.linalg.solve(Σ, np.eye(n))
+        Σ_inv_X = np.linalg.solve(Σ, X)
 
-        β = GLS_beta_hat(Σ, y, X, C, nl)
-        std_β = np.sqrt(np.diagonal(np.linalg.solve(X.T @ Σ_inv @ X, np.eye(k))))
+        std_β = np.sqrt(np.diagonal(X.T @ Σ_inv_X))
 
         if verbose:
             print_regression_report(
@@ -385,4 +386,8 @@ def disaggregate_series(
 
     output = pd.Series(y_hat, index=df.index, name=target_column)
     output.index.freq = output.index.inferred_freq
+
+    if return_optimizer_result:
+        return output, optimizer_result
+
     return output
