@@ -61,6 +61,35 @@ class DisaggregationTests(unittest.TestCase):
 
         self.assertEqual(expected, sales_q_chow_lin.to_frame())
 
+    # Test case for quarterly to monthly disaggregation backcasting error
+    def test_chow_lin_backcasting_error(self):
+        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM2.csv", index_col=0)
+
+        low_freq_data = pd.read_csv("tests/data/AL_Quarterly_Data_Modified.csv")
+        high_freq_data = pd.read_csv("tests/data/AL_Monthly_Data_Modified_Shorter.csv")
+
+        low_freq_data.index = pd.to_datetime(low_freq_data["period"])
+        high_freq_data.index = pd.to_datetime(high_freq_data["period"])
+
+        low_freq_data = low_freq_data.dropna()
+        high_freq_data = high_freq_data.dropna()
+
+        low_freq_data = low_freq_data.drop(['period'], axis=1)
+        high_freq_data = high_freq_data.drop(['period'], axis = 1)
+        
+        expected.index = low_freq_data.index
+        expected.columns = ["Value"]
+
+        sales_q_chow_lin = disaggregate_series(
+                        low_freq_data,
+                        high_freq_data.assign(intercept=1),
+                        method="chow-lin",
+                        agg_func="first",
+                        optimizer_kwargs={"method": "powell"},
+                        )
+
+        self.assertEqual(expected, high_freq_data.to_frame())
+
     def test_chow_lin_two_indicator(self):
         expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
         expected.index = self.exports_q.index
