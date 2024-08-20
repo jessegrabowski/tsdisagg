@@ -79,7 +79,7 @@ class DisaggregationTests(unittest.TestCase):
 
     # Test case for quarterly to monthly disaggregation backcasting error
     def test_chow_lin_backcasting_error(self):
-        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM2.csv", index_col=0)
+        expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM_2.csv", index_col=0)
 
         low_freq_data = pd.read_csv("tests/data/AL_Quarterly_Data_Modified.csv")
         high_freq_data = pd.read_csv("tests/data/AL_Monthly_Data_Modified_Shorter.csv")
