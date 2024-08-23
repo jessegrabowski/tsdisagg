@@ -80,7 +80,7 @@ class DisaggregationTests(unittest.TestCase):
         expected.index = low_freq_data.index
         expected.columns = ["Value"]
 
-        sales_q_chow_lin = disaggregate_series(
+        m_chow_lin = disaggregate_series(
                         low_freq_data,
                         high_freq_data.assign(intercept=1),
                         method="chow-lin",
@@ -88,7 +88,35 @@ class DisaggregationTests(unittest.TestCase):
                         optimizer_kwargs={"method": "powell"},
                         )
 
-        self.assertEqual(expected, high_freq_data.to_frame())
+        self.assertEqual(expected, m_chow_lin.to_frame())
+
+    def test_chow_lin_backcasting_error_YtoQ(self):
+        expected = pd.read_csv("tests/data/Annual-To-Quarter-Results.csv", index_col=0)
+
+        low_freq_data = pd.read_csv("tests/data/AL_Annual_Data_Shorter.csv")
+        high_freq_data = pd.read_csv("tests/data/AL_Quarterly_Data_Modified.csv")
+
+        low_freq_data.index = pd.to_datetime(low_freq_data["period"])
+        high_freq_data.index = pd.to_datetime(high_freq_data["period"])
+
+        low_freq_data = low_freq_data.dropna()
+        high_freq_data = high_freq_data.dropna()
+
+        low_freq_data = low_freq_data.drop(['period'], axis=1)
+        high_freq_data = high_freq_data.drop(['period'], axis = 1)
+        
+        expected.index = low_freq_data.index
+        expected.columns = ["Value"]
+
+        q_chow_lin = disaggregate_series(
+                        low_freq_data,
+                        high_freq_data.assign(intercept=1),
+                        method="chow-lin",
+                        agg_func="first",
+                        optimizer_kwargs={"method": "powell"},
+                        )
+
+        self.assertEqual(expected, q_chow_lin.to_frame())
 
     def test_chow_lin_two_indicator(self):
         expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
