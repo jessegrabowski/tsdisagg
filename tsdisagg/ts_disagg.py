@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from scipy import linalg, stats
+from scipy import stats
 from scipy.optimize import OptimizeResult, minimize
 from scipy.stats import multivariate_normal
 
@@ -22,7 +22,7 @@ def build_conversion_matrix(n, nl, i_len, C_mask=None, agg_func="sum"):
     excess = n - i_len * nl
     extra_periods = int(np.ceil(excess / i_len))
 
-    C_mask = C_mask or np.full(nl, True)
+    C_mask = C_mask if C_mask is not None else np.full(nl, True)
 
     if agg_func == "sum":
         i = np.ones((i_len, 1))
@@ -34,8 +34,10 @@ def build_conversion_matrix(n, nl, i_len, C_mask=None, agg_func="sum"):
     elif agg_func == "last":
         i = np.zeros((i_len, 1))
         i[-1] = 1
+    else:
+        raise ValueError("Invalid agg_func")
 
-    C = linalg.kron(np.eye(nl + extra_periods), i.T)
+    C = np.kron(np.eye(nl + extra_periods), i.T)
     C = C[C_mask, :n]
 
     return C
