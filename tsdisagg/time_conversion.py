@@ -1,25 +1,11 @@
+import numpy as np
 import pandas as pd
 
-MONTHS = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-]
+MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
 QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
-VALID_YEARLY = YEARLY_FREQS + [
-    f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS
-]
+VALID_YEARLY = YEARLY_FREQS + [f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS]
 VALID_QUARTERLY = QUARTERLY_FREQS + [
     f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS
 ]
@@ -93,9 +79,7 @@ def auto_step_down_base_freq(freq):
     high_freq_name = ORDER_TO_FREQ.get(one_freq_down)
 
     if not high_freq_name:
-        raise NotImplementedError(
-            f"No frequency lower than {freq_name} currently supported"
-        )
+        raise NotImplementedError(f"No frequency lower than {freq_name} currently supported")
 
     low_freq_code = LONG_FREQ_TO_CODE[freq_name]
     high_freq_code = LONG_FREQ_TO_CODE[high_freq_name]
@@ -258,32 +242,56 @@ def make_companion_index(df, target_freq):
 
 
 def handle_endpoint_differences(low_freq_df, high_freq_df):
+    """
+    Create a mask for the aggregation matrix ``C`` that ignores extra rows due to mis-matched frequencies.
+
+    Parameters
+    ----------
+    low_freq_df
+    high_freq_df
+
+    Returns
+    -------
+    C_mask: np.ndarray of bool
+        Mask for the converstion matrix, with False where extra initial high-frequency data was provided, and True
+        elsewhere.
+
+    Notes
+    -----
+    When the user provides "extra" high frequency data, it must be masked out before estimation can proceed. This is
+    best shown by way of examples. Consider a yearly to quarterly conversion:
+
+    .. code:: python
+
+
+
+    """
     low_freq = low_freq_df.index.inferred_freq
 
     # these are stored as adverbs (e.g. yearly), so remove the -ly suffix
     attr = get_frequency_name(low_freq)[:-2]
 
-    # With quarter, full_set will always be [1, 2, 3, 4]
-    # Doing this will let "C_mask = C_mask or np.full(nl, True)" in ts_disagg.py/build_conversion_matrix() to do np.full(nl, True), solve the issue
-    if attr == "quarter":
-        C_mask = None
-        return C_mask
+    if attr != "quarter":
+        low_freq_idx = getattr(low_freq_df.index, attr)
+        high_freq_idx = getattr(high_freq_df.index, attr)
+    else:
+        # Quarters are not uniquely identified by just the quarter, need to look at quarter-month
+        lf_Q, hf_Q = map(lambda x: getattr(x.index, attr), [low_freq_df, high_freq_df])
+        lf_M, hf_M = map(lambda x: getattr(x.index, "year"), [low_freq_df, high_freq_df])
+        low_freq_idx = [f"{Y}-{Q}" for Q, Y in zip(lf_Q, lf_M)]
+        high_freq_idx = [f"{Y}-{Q}" for Q, Y in zip(hf_Q, hf_M)]
 
-    low_freq_idx = getattr(low_freq_df.index, attr)
-    high_freq_idx = getattr(high_freq_df.index, attr)
     low_freq_set = set(low_freq_idx)
     high_freq_set = set(high_freq_idx)
 
     full_set = sorted(list(low_freq_set.union(high_freq_set)))
-    C_mask = [x in low_freq_idx for x in full_set]
+    C_mask = np.array([x in low_freq_idx for x in full_set])
 
     return C_mask
 
 
 def align_and_merge_dfs(low_freq_df, high_freq_df):
     C_mask = handle_endpoint_differences(low_freq_df, high_freq_df)
-    df = pd.merge(
-        low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
-    )
+    df = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
 
     return df, C_mask
