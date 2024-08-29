@@ -1,7 +1,20 @@
 import numpy as np
 import pandas as pd
 
-MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+MONTHS = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+]
 YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
 QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
