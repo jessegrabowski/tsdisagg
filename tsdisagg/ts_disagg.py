@@ -1,8 +1,10 @@
 import warnings
+
 from typing import Literal, cast
 
 import numpy as np
 import pandas as pd
+
 from scipy import linalg, stats
 from scipy.optimize import OptimizeResult, minimize
 
@@ -53,14 +55,15 @@ def build_conversion_matrix(
     n_low, n_high = low_freq_df.shape[0], high_freq_df.shape[0]
 
     low_index, high_index = low_freq_df.index, high_freq_df.index
-    low_freq, high_freq = low_index.freq, high_index.freq
+    low_freq, _high_freq = low_index.freq, high_index.freq
 
     low_freq_period = (
         "Y" if low_freq.name.startswith("Y") or low_freq.name.startswith("BY") else "Q"
     )
     high_freq_df["low_freq_period"] = high_freq_df.index.to_period(freq=low_freq_period)
     period_to_row_idx = {
-        period: idx for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))
+        period: idx
+        for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))
     }
 
     C = np.zeros((n_low, n_high))
@@ -70,9 +73,12 @@ def build_conversion_matrix(
         row_idx = period_to_row_idx.get(low_freq_period, None)
         if row_idx is not None:
             idx = cast(
-                np.ndarray[int], np.flatnonzero(high_freq_df.low_freq_period == low_freq_period)
+                np.ndarray[int],
+                np.flatnonzero(high_freq_df.low_freq_period == low_freq_period),
             )
-            idx, fill_value = _get_C_index_and_fill(idx, agg_func, time_conversion_factor)
+            idx, fill_value = _get_C_index_and_fill(
+                idx, agg_func, time_conversion_factor
+            )
             C[row_idx, idx] = fill_value
 
     return C
@@ -81,7 +87,9 @@ def build_conversion_matrix(
 def log_likelihood(nl, CΣCT, ul):
     sign, log_det = np.linalg.slogdet(CΣCT)
 
-    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (log_det + ul.T @ np.linalg.solve(CΣCT, ul))
+    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (
+        log_det + ul.T @ np.linalg.solve(CΣCT, ul)
+    )
 
 
 def build_difference_matrix(n, h=0):
@@ -91,14 +99,16 @@ def build_difference_matrix(n, h=0):
 
 
 def build_distribution_matrix(Σ, C):
-    return np.linalg.solve(C @ Σ @ C.T, C @ Σ).T
+    return np.linalg.solve(np.linalg.multi_dot([C, Σ, C.T]), C @ Σ).T
 
 
 def build_chao_lin_covariance(rho, sigma_e_sq, n):
-    row = rho ** np.arange(n)
-    Σ_CL = np.r_[[np.r_[np.zeros(n - i), row[:i]] for i in range(n, 0, -1)]]
-    Σ_CL += Σ_CL.T - np.eye(n)
-    Σ_CL *= sigma_e_sq / (1 - rho)
+    iota = np.arange(n)[:, None].repeat(n, axis=1)
+    power_matrix = np.abs(iota - iota.T)
+
+    Σ_CL = rho**power_matrix
+    Σ_CL *= sigma_e_sq / (1 - rho**2)
+
     return Σ_CL
 
 
@@ -110,7 +120,7 @@ def build_litterman_covariance(rho, sigma_e_sq, n):
 
 
 def GLS_beta_hat(Σ, y, X, C):
-    CΣCT = C @ Σ @ C.T
+    CΣCT = np.linalg.multi_dot([C, Σ, C.T])
     CX = C @ X
     XTCT = X.T @ C.T
 
@@ -131,12 +141,19 @@ def f_minimize(params, y, X, C, f_cov):
     nl = y.shape[0]
 
     ρ, sigma_e_sq = params
+
+    # TODO: This correction is just pure magic. It makes the results match, but I haven't been able to figure out
+    #  why it's needed (it changes the scaling factor of the CL covariance from sigma ** 2 / (1 - rho **2) to
+    #  sigma ** 2 / (1 - rho)
+    #  I think it has to do with the fact that I'm estimating sigma, whereas timedisagg just computes it via the RSS?
+    sigma_e_sq = (1 + ρ) * sigma_e_sq
+
     Σ = f_cov(ρ, sigma_e_sq, n)
     β = GLS_beta_hat(Σ, y, X, C)
 
     p = X @ β
     ul = y - C @ p
-    CΣCT = C @ Σ @ C.T
+    CΣCT = np.linalg.multi_dot([C, Σ, C.T])
     return -log_likelihood(nl, CΣCT, ul)
 
 
@@ -149,7 +166,9 @@ def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
     return Σ_D
 
 
-def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="proportional"):
+def build_denton_charlotte_distribution_matrix(
+    n, nl, C, X, h=1, criterion="proportional"
+):
     # Here is the Charlotte correction: slice off the top h rows of the difference matrix
     Δ = build_difference_matrix(n, h)[h:, :]
     if criterion == "proportional":
@@ -159,7 +178,7 @@ def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="prop
     W = np.linalg.solve(W_1, W_2)
 
     w_theta = W[:n, n:]
-    w_gamma = W[n:, n:]
+    W[n:, n:]
 
     return w_theta
 
@@ -200,7 +219,6 @@ def print_regression_report(y, X, params, std_β, C, method):
 
 def prepare_input_dataframes(df1, df2, target_freq, method):
     df1_out = df1.copy()
-    no_high_freq_data = df2 is None
 
     if not isinstance(df1.index, pd.core.indexes.datetimes.DatetimeIndex):
         raise ValueError(
@@ -262,7 +280,9 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     low_name = get_frequency_name(low_freq)
     time_conversion_factor = FREQ_CONVERSION_FACTORS[low_name][high_name]
 
-    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(df1_out, high_freq)
+    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(
+        df1_out, high_freq
+    )
 
     if isinstance(df1_out, pd.Series):
         df1_out.name = low_freq_name
@@ -365,7 +385,9 @@ def disaggregate_series(
             f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}."
         )
     if criterion not in ["proportional", "additive"]:
-        raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
+        raise ValueError(
+            f"Criterion should be one of 'proportional', 'additive'. Got {criterion}"
+        )
     if agg_func not in ["mean", "sum", "first", "last"]:
         raise ValueError(
             f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}"
@@ -378,7 +400,9 @@ def disaggregate_series(
         low_freq_df, high_freq_df, target_freq, method
     )
 
-    C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
+    C = build_conversion_matrix(
+        low_freq_df, high_freq_df, time_conversion_factor, agg_func
+    )
     drop_rows = np.all(C == 0, axis=1)
     if any(drop_rows):
         dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
