@@ -1,6 +1,6 @@
 import unittest
 
-from typing import Callable, List, Tuple
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -18,8 +18,8 @@ from tsdisagg.time_conversion import (
 
 @composite
 def freq(
-    draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]
-) -> Tuple[str, str, bool]:
+    draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]
+) -> tuple[str, str, bool]:
     bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
     suffixes = [f"-{x}" for x in suffix_list]
 
@@ -39,9 +39,7 @@ class TestCompanionIndex(unittest.TestCase):
         base, suffix, test_df = params
         freq = base + suffix
 
-        df = pd.Series(
-            1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test"
-        )
+        df = pd.Series(1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test")
         if test_df:
             df = df.to_frame()
 
@@ -54,9 +52,7 @@ class TestCompanionIndex(unittest.TestCase):
         self.assertEqual(target_freq, index.freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(
-            df, high_freq_df, left_index=True, right_index=True, how="outer"
-        )
+        result = pd.merge(df, high_freq_df, left_index=True, right_index=True, how="outer")
 
         self.assertEqual(result.shape[0], T * 12)
 
@@ -68,9 +64,7 @@ class TestCompanionIndex(unittest.TestCase):
         base, suffix, test_df = params
         freq = base + suffix
 
-        df = pd.Series(
-            1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test"
-        )
+        df = pd.Series(1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test")
         if test_df:
             df = df.to_frame()
 
@@ -83,9 +77,7 @@ class TestCompanionIndex(unittest.TestCase):
         low_freq_name, high_freq_name = get_frequency_names(df, target_freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(
-            df, high_freq_df, left_index=True, right_index=True, how="outer"
-        )
+        result = pd.merge(df, high_freq_df, left_index=True, right_index=True, how="outer")
         self.assertEqual(result.shape[0], T * 4)
 
         block_matrix = result.values[:, 0].reshape(T, 4)
@@ -96,9 +88,7 @@ class TestCompanionIndex(unittest.TestCase):
         base, suffix, test_df = params
         freq = base + suffix
 
-        df = pd.Series(
-            1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test"
-        )
+        df = pd.Series(1, index=pd.date_range("1900-01-01", "1902-01-01", freq=freq), name="test")
         if test_df:
             df = df.to_frame()
 
@@ -110,9 +100,7 @@ class TestCompanionIndex(unittest.TestCase):
         low_freq_name, high_freq_name = get_frequency_names(df, target_freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(
-            df, high_freq_df, left_index=True, right_index=True, how="outer"
-        )
+        result = pd.merge(df, high_freq_df, left_index=True, right_index=True, how="outer")
 
         self.assertEqual(result.shape[0], T * 3)
 

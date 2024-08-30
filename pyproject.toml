@@ -1,3 +1,67 @@
+[project]
+name = "tsdisagg"
+dynamic = ['version']
+description = "Statistical tools for converting low frequency time series data to higher frequencies"
+license = { file = 'LICENSE'}
+authors = [{name = "Jesse Grabowski", email="jessegrabowski@gmail.com"}]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics"
+]
+
+keywords = [
+  "time series",
+  "decomposition",
+  "datetime",
+  "econometrics"
+]
+
+dependencies = [
+    "numpy",
+    "pandas >= 2.2.0",
+    "scipy"
+]
+
+[project.urls]
+Repository = "https://github.com/jessegrabowski/tsdisagg.git"
+Issues = "https://github.com/jessegrabowski/tsdisagg/issues"
+
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "versioneer"
+]
+
+
+[build-system]
+requires = [
+    "numpy",
+    "setuptools",
+    "versioneer[toml]",
+]
+build-backend = "setuptools.build_meta"
+
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "tsdisagg/_version.py"
+versionfile_build = "tsdisagg/_version.py"
+tag_prefix = 'v'
+
+[tool.setuptools]
+py-modules = ['tsdisagg']
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 xfail_strict = true
@@ -12,6 +76,11 @@ exclude_lines = [
   "raise NotImplementedError",
   "if TYPE_CHECKING:",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["tsdisagg/_version.py", "setup.py"]
 
 
 [tool.ruff.lint]
@@ -45,6 +114,7 @@ ignore = [
   "D415",
   "D417",
 ]
+
 
 [tool.ruff.lint.isort]
 lines-between-types = 1
