@@ -1,3 +1,16 @@
+[build-system]
+requires = ["setuptools", "versioneer[toml]"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "tsdisagg/_version.py"
+versionfile_build = "tsdisagg/_version.py"
+tag_prefix = 'v'
+
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 xfail_strict = true
