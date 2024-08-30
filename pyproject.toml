@@ -3,7 +3,6 @@ name = "tsdisagg"
 dynamic = ['version']
 description = "Statistical tools for converting low frequency time series data to higher frequencies"
 license = { file = 'LICENSE'}
-url = "https://github.com/jessegrabowski/tsdisagg"
 authors = [{name = "Jesse Grabowski", email="jessegrabowski@gmail.com"}]
 classifiers = [
     "License :: OSI Approved :: MIT License",
