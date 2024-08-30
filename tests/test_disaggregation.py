@@ -1,10 +1,12 @@
 import unittest
+
 from typing import Callable
 
 import numpy as np
 import pandas as pd
 import pandas.testing as pd_testing
 import pytest
+
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
@@ -44,7 +46,9 @@ def generate_random_index_pair(
         A tuple containing the low-frequency and high-frequency DatetimeIndexes.
     """
     if start is None:
-        start = pd.Timestamp.now().normalize() - pd.DateOffset(years=np.random.randint(0, 30))
+        start = pd.Timestamp.now().normalize() - pd.DateOffset(
+            years=np.random.randint(0, 30)
+        )
 
     low_freq_index = pd.date_range(start=start, periods=low_periods, freq=low_freq)
     high_freq = pd._libs.tslibs.to_offset(high_freq)
@@ -53,9 +57,13 @@ def generate_random_index_pair(
     high_end = low_freq_index[-1] + high_freq * extra_high_freq_end
 
     if high_periods is None:
-        high_periods = len(pd.date_range(start=high_start, end=high_end, freq=high_freq))
+        high_periods = len(
+            pd.date_range(start=high_start, end=high_end, freq=high_freq)
+        )
 
-    high_freq_index = pd.date_range(start=high_start, periods=max(0, high_periods), freq=high_freq)
+    high_freq_index = pd.date_range(
+        start=high_start, periods=max(0, high_periods), freq=high_freq
+    )
 
     return (
         pd.Series(1.0, index=low_freq_index, name="low_freq"),
@@ -127,14 +135,20 @@ def test_build_C_matrix(agg_func, frequencies):
         full_size = 4 if high_name == "quarterly" else 12
         full_size_mask = group_size.values == full_size
         expected_result = groups.high_freq.agg(agg_func).values
-        np.testing.assert_allclose(high_agg[full_size_mask], expected_result[full_size_mask])
+        np.testing.assert_allclose(
+            high_agg[full_size_mask], expected_result[full_size_mask]
+        )
 
     elif low_name == "quarterly":
-        groups = high_with_info.groupby(["year", "quarter"])  # .high_freq.agg(agg_func).values
+        groups = high_with_info.groupby(
+            ["year", "quarter"]
+        )  # .high_freq.agg(agg_func).values
         group_size = groups.size()
         full_size_mask = group_size.values == 3
         expected_result = groups.high_freq.agg(agg_func).values
-        np.testing.assert_allclose(high_agg[full_size_mask], expected_result[full_size_mask])
+        np.testing.assert_allclose(
+            high_agg[full_size_mask], expected_result[full_size_mask]
+        )
 
 
 class DisaggregationTests(unittest.TestCase):
@@ -218,7 +232,9 @@ class DisaggregationTests(unittest.TestCase):
         )
 
         assert np.all(expected.index == m_chow_lin.index)
-        np.testing.assert_allclose(expected.values.ravel(), m_chow_lin.values, rtol=1e-3)
+        np.testing.assert_allclose(
+            expected.values.ravel(), m_chow_lin.values, rtol=1e-3
+        )
 
     def test_chow_lin_backcasting_error_YtoQ(self):
         expected = pd.read_csv("tests/data/AL_A_to_Q_expected.csv")
@@ -236,11 +252,15 @@ class DisaggregationTests(unittest.TestCase):
         expected.index = expected.index + expected.index.freq
 
         low_freq_data = pd.read_csv(
-            "tests/data/AL_Annual_Data_Shorter.csv", parse_dates=True, index_col="period"
+            "tests/data/AL_Annual_Data_Shorter.csv",
+            parse_dates=True,
+            index_col="period",
         ).dropna()
         low_freq_data.index.freq = low_freq_data.index.inferred_freq
         high_freq_data = pd.read_csv(
-            "tests/data/AL_Quarterly_Data_Modified.csv", parse_dates=True, index_col="period"
+            "tests/data/AL_Quarterly_Data_Modified.csv",
+            parse_dates=True,
+            index_col="period",
         ).dropna()
         high_freq_data.index.freq = high_freq_data.index.inferred_freq
 
@@ -253,11 +273,16 @@ class DisaggregationTests(unittest.TestCase):
             return_optim_res=True,
         )
 
+        assert res.success
         assert np.all(expected.index == q_chow_lin.index)
-        np.testing.assert_allclose(expected.values.ravel(), q_chow_lin.values.ravel(), rtol=1e-3)
+        np.testing.assert_allclose(
+            expected.values.ravel(), q_chow_lin.values.ravel(), rtol=1e-3
+        )
 
     def test_chow_lin_two_indicator(self):
-        expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
+        expected = pd.read_csv(
+            "tests/data/R_output_chow_lin_two_indicator.csv", index_col=0
+        )
         expected.index = self.exports_q.index
         expected.columns = ["sales"]
 
@@ -280,7 +305,10 @@ class DisaggregationTests(unittest.TestCase):
         expected.columns = ["sales"]
 
         sales_q_denton = disaggregate_series(
-            self.sales_a, method="denton", agg_func="sum", optimizer_kwargs={"method": "powell"}
+            self.sales_a,
+            method="denton",
+            agg_func="sum",
+            optimizer_kwargs={"method": "powell"},
         )
         self.assertEqual(expected, sales_q_denton.to_frame())
 
@@ -299,7 +327,9 @@ class DisaggregationTests(unittest.TestCase):
         self.assertEqual(expected, sales_q_dc.to_frame())
 
     def test_denton_cholette_w_indicator(self):
-        expected = pd.read_csv("tests/data/R_output_denton_cholette_w_indicator.csv", index_col=0)
+        expected = pd.read_csv(
+            "tests/data/R_output_denton_cholette_w_indicator.csv", index_col=0
+        )
         expected.index = self.exports_q.index
         expected.columns = ["sales"]
 
