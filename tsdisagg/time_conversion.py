@@ -255,35 +255,3 @@ def make_companion_index(df, target_freq):
 
     high_freq_index.freq = target_freq
     return high_freq_index
-
-
-def handle_endpoint_differences(low_freq_df, high_freq_df):
-    low_freq = low_freq_df.index.inferred_freq
-
-    # these are stored as adverbs (e.g. yearly), so remove the -ly suffix
-    attr = get_frequency_name(low_freq)[:-2]
-
-    # With quarter, full_set will always be [1, 2, 3, 4]
-    # Doing this will let "C_mask = C_mask or np.full(nl, True)" in ts_disagg.py/build_conversion_matrix() to do np.full(nl, True), solve the issue
-    if attr == "quarter":
-        C_mask = None
-        return C_mask
-
-    low_freq_idx = getattr(low_freq_df.index, attr)
-    high_freq_idx = getattr(high_freq_df.index, attr)
-    low_freq_set = set(low_freq_idx)
-    high_freq_set = set(high_freq_idx)
-
-    full_set = sorted(list(low_freq_set.union(high_freq_set)))
-    C_mask = [x in low_freq_idx for x in full_set]
-
-    return C_mask
-
-
-def align_and_merge_dfs(low_freq_df, high_freq_df):
-    C_mask = handle_endpoint_differences(low_freq_df, high_freq_df)
-    df = pd.merge(
-        low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
-    )
-
-    return df, C_mask

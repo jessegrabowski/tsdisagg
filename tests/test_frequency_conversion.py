@@ -9,7 +9,7 @@ from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
 from tsdisagg.time_conversion import MONTHS, get_frequency_names, make_companion_index
-from tsdisagg.ts_disagg import prepare_input_dataframes
+from tsdisagg.ts_disagg import build_conversion_matrix, prepare_input_dataframes
 
 
 @composite
@@ -55,7 +55,7 @@ class TestPandasIndex(unittest.TestCase):
             low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
         )
 
-        df, _, _ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
+        df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
         self.assertEqual(df.shape[0], result.shape[0])
 
     @given(freq(base="Y", suffix_list=MONTHS))
@@ -75,7 +75,7 @@ class TestPandasIndex(unittest.TestCase):
             low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
         )
 
-        df, _, _ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
+        df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
 
         self.assertEqual(df.shape[0], result.shape[0])
 
@@ -96,10 +96,43 @@ class TestPandasIndex(unittest.TestCase):
             low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
         )
 
-        df, C_mask, factor = prepare_input_dataframes(
+        df, df_low, df_high, factor = prepare_input_dataframes(
             low_freq_df, None, target_freq, "denton"
         )
         self.assertEqual(df.shape[0], result.shape[0])
+
+
+def test_build_conversion_matrix():
+    freq = "QS-OCT"
+    target_freq = "MS"
+    lf_start_date = "1995-06-01"
+    hf_start_date = "1995-03-01"
+    end_date = "2001-12-01"
+
+    low_freq_df = pd.Series(
+        1, index=pd.date_range(lf_start_date, end_date, freq=freq), name="low_freq"
+    )
+    high_freq_df = pd.Series(
+        1,
+        index=pd.date_range(hf_start_date, end_date, freq=target_freq),
+        name="low_freq",
+    )
+
+    df, low_freq_df, high_freq_df, time_conversion_factor = prepare_input_dataframes(
+        low_freq_df, high_freq_df, target_freq, "denton"
+    )
+
+    df.iloc[:, 0].dropna().values
+    df.drop(columns=df.columns[0]).values
+
+    C = build_conversion_matrix(
+        low_freq_df, high_freq_df, time_conversion_factor, agg_func="sum"
+    )
+
+    assert C.shape[0] == low_freq_df.shape[0]
+    assert C.shape[1] == high_freq_df.shape[0]
+
+    print(C @ high_freq_df)
 
 
 if __name__ == "__main__":
