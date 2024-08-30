@@ -1,15 +1,13 @@
-from functools import partial
+import warnings
+from typing import Literal, cast
 
 import numpy as np
 import pandas as pd
-
 from scipy import linalg, stats
 from scipy.optimize import OptimizeResult, minimize
-from scipy.stats import multivariate_normal
 
 from tsdisagg.time_conversion import (
     FREQ_CONVERSION_FACTORS,
-    align_and_merge_dfs,
     auto_step_down_base_freq,
     get_frequency_name,
     make_companion_index,
@@ -17,28 +15,73 @@ from tsdisagg.time_conversion import (
     validate_freqs,
 )
 
+AGG_FUNC = Literal["sum", "mean", "first", "last"]
+METHOD = Literal["denton", "denton-cholette", "chow-lin", "litterman"]
 
-def build_conversion_matrix(n, nl, i_len, C_mask=None, agg_func="sum"):
-    excess = n - i_len * nl
-    extra_periods = int(np.ceil(excess / i_len))
 
-    C_mask = C_mask or np.full(nl, True)
-
-    if agg_func == "sum":
-        i = np.ones((i_len, 1))
+def _get_C_index_and_fill(
+    idx: np.ndarray[int], agg_func: AGG_FUNC, time_conversion_factor: int
+) -> tuple[np.ndarray[int] | int, float]:
+    if agg_func in ["sum", "first", "last"]:
+        fill_value = 1.0
     elif agg_func == "mean":
-        i = np.ones((i_len, 1)) / i_len
-    elif agg_func == "first":
-        i = np.zeros((i_len, 1))
-        i[0] = 1
-    elif agg_func == "last":
-        i = np.zeros((i_len, 1))
-        i[-1] = 1
+        fill_value = 1 / time_conversion_factor
+    else:
+        raise ValueError("Invalid method")
 
-    C = linalg.kron(np.eye(nl + extra_periods), i.T)
-    C = C[C_mask, :n]
+    if len(idx) != time_conversion_factor:
+        fill_value = 0.0
+
+    if agg_func == "first":
+        idx = idx[0]
+    elif agg_func == "last":
+        idx = idx[-1]
+
+    return idx, fill_value
+
+
+def build_conversion_matrix(
+    low_freq_df: pd.Series | pd.DataFrame,
+    high_freq_df: pd.Series | pd.DataFrame,
+    time_conversion_factor: int,
+    agg_func: AGG_FUNC,
+):
+    high_freq_df = high_freq_df.copy()
+    if isinstance(high_freq_df, pd.Series):
+        high_freq_df = high_freq_df.to_frame()
+
+    n_low, n_high = low_freq_df.shape[0], high_freq_df.shape[0]
+
+    low_index, high_index = low_freq_df.index, high_freq_df.index
+    low_freq, high_freq = low_index.freq, high_index.freq
+
+    low_freq_period = (
+        "Y" if low_freq.name.startswith("Y") or low_freq.name.startswith("BY") else "Q"
+    )
+    high_freq_df["low_freq_period"] = high_freq_df.index.to_period(freq=low_freq_period)
+    period_to_row_idx = {
+        period: idx for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))
+    }
+
+    C = np.zeros((n_low, n_high))
+    grouped = high_freq_df.groupby("low_freq_period")
+
+    for low_freq_period, group in grouped:
+        row_idx = period_to_row_idx.get(low_freq_period, None)
+        if row_idx is not None:
+            idx = cast(
+                np.ndarray[int], np.flatnonzero(high_freq_df.low_freq_period == low_freq_period)
+            )
+            idx, fill_value = _get_C_index_and_fill(idx, agg_func, time_conversion_factor)
+            C[row_idx, idx] = fill_value
 
     return C
+
+
+def log_likelihood(nl, CΣCT, ul):
+    sign, log_det = np.linalg.slogdet(CΣCT)
+
+    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (log_det + ul.T @ np.linalg.solve(CΣCT, ul))
 
 
 def build_difference_matrix(n, h=0):
@@ -55,7 +98,7 @@ def build_chao_lin_covariance(rho, sigma_e_sq, n):
     row = rho ** np.arange(n)
     Σ_CL = np.r_[[np.r_[np.zeros(n - i), row[:i]] for i in range(n, 0, -1)]]
     Σ_CL += Σ_CL.T - np.eye(n)
-    Σ_CL *= sigma_e_sq / (1 - rho**2)
+    Σ_CL *= sigma_e_sq / (1 - rho)
     return Σ_CL
 
 
@@ -66,10 +109,18 @@ def build_litterman_covariance(rho, sigma_e_sq, n):
     return Σ_L
 
 
-def GLS_beta_hat(Σ, y, X, C, nl):
-    CΣCT_inv = np.linalg.inv(C @ Σ @ C.T)
-    A = X.T @ C.T @ CΣCT_inv @ C @ X
-    B = X.T @ C.T @ CΣCT_inv @ y
+def GLS_beta_hat(Σ, y, X, C):
+    CΣCT = C @ Σ @ C.T
+    CX = C @ X
+    XTCT = X.T @ C.T
+
+    lu, piv = linalg.lu_factor(CΣCT)
+    Z1 = linalg.lu_solve((lu, piv), CX)
+    Z2 = linalg.lu_solve((lu, piv), y)
+
+    A = XTCT @ Z1
+    B = XTCT @ Z2
+
     β = np.linalg.solve(A, B)
 
     return β
@@ -77,17 +128,16 @@ def GLS_beta_hat(Σ, y, X, C, nl):
 
 def f_minimize(params, y, X, C, f_cov):
     n, k = X.shape
+    nl = y.shape[0]
 
-    *betas, ρ, sigma_e_sq = params
-    β = np.stack(betas)
+    ρ, sigma_e_sq = params
     Σ = f_cov(ρ, sigma_e_sq, n)
+    β = GLS_beta_hat(Σ, y, X, C)
 
     p = X @ β
-
-    mu = C @ p
-    cov = C @ Σ @ C.T
-
-    return -multivariate_normal.logpdf(y, mu, cov) / n
+    ul = y - C @ p
+    CΣCT = C @ Σ @ C.T
+    return -log_likelihood(nl, CΣCT, ul)
 
 
 def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
@@ -99,9 +149,7 @@ def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
     return Σ_D
 
 
-def build_denton_charlotte_distribution_matrix(
-    n, nl, C, X, h=1, criterion="proportional"
-):
+def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="proportional"):
     # Here is the Charlotte correction: slice off the top h rows of the difference matrix
     Δ = build_difference_matrix(n, h)[h:, :]
     if criterion == "proportional":
@@ -111,7 +159,7 @@ def build_denton_charlotte_distribution_matrix(
     W = np.linalg.solve(W_1, W_2)
 
     w_theta = W[:n, n:]
-    W[n:, n:]
+    w_gamma = W[n:, n:]
 
     return w_theta
 
@@ -214,9 +262,7 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     low_name = get_frequency_name(low_freq)
     time_conversion_factor = FREQ_CONVERSION_FACTORS[low_name][high_name]
 
-    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(
-        df1_out, high_freq
-    )
+    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(df1_out, high_freq)
 
     if isinstance(df1_out, pd.Series):
         df1_out.name = low_freq_name
@@ -233,11 +279,8 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
             "dataframe of high-frequency indicators must be provided."
         )
 
-    df, C_mask = align_and_merge_dfs(df1_out, df2_out)
-    if no_high_freq_data:
-        C_mask = None
-
-    return df, C_mask, time_conversion_factor
+    df = pd.merge(df1_out, df2_out, left_index=True, right_index=True, how="outer")
+    return df, df1_out, df2_out, time_conversion_factor
 
 
 def disaggregate_series(
@@ -245,14 +288,14 @@ def disaggregate_series(
     high_freq_df=None,
     target_freq=None,
     target_column=None,
-    agg_func="sum",
-    method="denton-cholette",
+    agg_func: AGG_FUNC = "sum",
+    method: METHOD = "denton-cholette",
     criterion="proportional",
     h=1,
     optimizer_kwargs=None,
     verbose=True,
-    return_optimizer_result=False,
-) -> pd.Series | tuple[pd.Series, OptimizeResult]:
+    return_optim_res=False,
+) -> pd.DataFrame | tuple[pd.DataFrame, OptimizeResult]:
     """
     Transform a low frequency time series into a higher frequency series, preserving certain statistics aggregate
     statistics.
@@ -301,17 +344,18 @@ def disaggregate_series(
     verbose: bool, default True
         Whether to print regression results. Ignored if method is "denton" or "denton-cholette", as these have no
         regression results to report.
-    return_optimizer_result: bool, default False
-        If True, return the OptimizerResult from ``scipy.optimize.minimize`. Useful for debugging.
+    return_optim_res: bool, default False
+        Whether to return the optimization results from scipy.optimize.minimize. Ignored if mode is "denton" or
+        "denton-cholette"
 
     Returns
     -------
     high_freq_df: Series
         A Pandas Series object containing the interpolated high frequency data.
-    optimizer_result: OptimizeResult
-        Results object returned by ``scipy.optimize.minimze``. Only returned if ``return_optimizer_result = True``.
+
+    result: OptimizeResult
+        Optimization result returned by scipy.optimize.minimize. Only returned if return_optimizer_result is True
     """
-    optimizer_result = None
 
     if isinstance(low_freq_df, pd.Series):
         low_freq_df = low_freq_df.to_frame()
@@ -321,9 +365,7 @@ def disaggregate_series(
             f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}."
         )
     if criterion not in ["proportional", "additive"]:
-        raise ValueError(
-            f"Criterion should be one of 'proportional', 'additive'. Got {criterion}"
-        )
+        raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
     if agg_func not in ["mean", "sum", "first", "last"]:
         raise ValueError(
             f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}"
@@ -332,29 +374,37 @@ def disaggregate_series(
     target_column = target_column or low_freq_df.columns[0]
     target_idx = np.flatnonzero(low_freq_df.columns == target_column)[0]
 
-    df, C_mask, time_conversion_factor = prepare_input_dataframes(
+    df, low_freq_df, high_freq_df, time_conversion_factor = prepare_input_dataframes(
         low_freq_df, high_freq_df, target_freq, method
     )
 
-    y = df.iloc[:, target_idx].dropna().values
-    X = df.drop(columns=df.columns[target_idx]).values
+    C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
+    drop_rows = np.all(C == 0, axis=1)
+    if any(drop_rows):
+        dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
+        warnings.warn(
+            f'Insufficent high-frequency data to decompose the following dates: {", ".join(dropped)}',
+            UserWarning,
+        )
+
+    y = df.iloc[:, target_idx].dropna().loc[~drop_rows]
+    C = C[~drop_rows, :]
+    X = df.drop(columns=df.columns[target_idx])
 
     n, k = X.shape
     nl = y.shape[0]
+    result = None
 
-    C = build_conversion_matrix(
-        n, nl, time_conversion_factor, agg_func=agg_func, C_mask=C_mask
-    )
     if method == "denton":
         assert k == 1
-        Σ = build_denton_covariance(n, C, X, h, criterion)
+        Σ = build_denton_covariance(n, C, X.values, h, criterion)
         D = build_distribution_matrix(Σ, C)
-        p = X.ravel()
+        p = X.values.ravel()
 
     elif method == "denton-cholette":
         assert k == 1
-        D = build_denton_charlotte_distribution_matrix(n, nl, C, X, h, criterion)
-        p = X.ravel()
+        D = build_denton_charlotte_distribution_matrix(n, nl, C, X.values, h, criterion)
+        p = X.values.ravel()
 
     else:
         if optimizer_kwargs is None:
@@ -370,25 +420,28 @@ def disaggregate_series(
             raise ValueError(f"Method {method} not supported.")
 
         # betas are unbounded, bound rho between 0 and 1 and sigma between 0 and +inf
-        bounds = [(None, None)] * k + [(1e-5, 1 - 1e-5), (1e-5, None)]
+        bounds = [(1e-5, 1 - 1e-5), (1e-5, None)]
 
-        x0 = np.full(2 + k, 0.8)
-        objective = partial(f_minimize, y=y, X=X, C=C, f_cov=f_cov)
+        x0 = np.full(2, 0.8)
+        result = minimize(
+            f_minimize,
+            x0=x0,
+            args=(y.values, X.values, C, f_cov),
+            bounds=bounds,
+            **optimizer_kwargs,
+        )
 
-        optimizer_result = minimize(objective, x0=x0, bounds=bounds, **optimizer_kwargs)
-
-        *betas, ρ, sigma_e_sq = optimizer_result.x
-        β = np.stack(betas)
+        ρ, sigma_e_sq = result.x
         Σ = f_cov(ρ, sigma_e_sq, n)
-        Σ_inv_X = np.linalg.solve(Σ, X)
-        std_β = np.sqrt(np.diagonal(X.T @ Σ_inv_X))
+        Σ_inv_X = np.linalg.solve(Σ, X.values)
+
+        β = GLS_beta_hat(Σ, y.values, X.values, C)
+        std_β = np.sqrt(np.diagonal(np.linalg.inv(X.values.T @ Σ_inv_X)))
 
         if verbose:
-            print_regression_report(
-                df.iloc[:, 0], df.iloc[:, 1:], np.r_[β, ρ, sigma_e_sq], std_β, C, method
-            )
+            print_regression_report(y, X, np.r_[β, ρ, sigma_e_sq], std_β, C, method)
 
-        p = X @ β
+        p = X.values @ β
         D = build_distribution_matrix(Σ, C)
 
     ul = y - C @ p
@@ -397,7 +450,7 @@ def disaggregate_series(
     output = pd.Series(y_hat, index=df.index, name=target_column)
     output.index.freq = output.index.inferred_freq
 
-    if return_optimizer_result:
-        return output, optimizer_result
+    if return_optim_res and result is not None:
+        return output, result
 
     return output
