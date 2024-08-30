@@ -17,9 +17,7 @@ MONTHS = [
 YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
 QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
-VALID_YEARLY = YEARLY_FREQS + [
-    f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS
-]
+VALID_YEARLY = YEARLY_FREQS + [f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS]
 VALID_QUARTERLY = QUARTERLY_FREQS + [
     f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS
 ]
@@ -93,9 +91,7 @@ def auto_step_down_base_freq(freq):
     high_freq_name = ORDER_TO_FREQ.get(one_freq_down)
 
     if not high_freq_name:
-        raise NotImplementedError(
-            f"No frequency lower than {freq_name} currently supported"
-        )
+        raise NotImplementedError(f"No frequency lower than {freq_name} currently supported")
 
     low_freq_code = LONG_FREQ_TO_CODE[freq_name]
     high_freq_code = LONG_FREQ_TO_CODE[high_freq_name]

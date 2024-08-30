@@ -27,7 +27,7 @@ jobs:
         echo "GITHUB_REF: ${GITHUB_REF}"
         # The GITHUB_REF should be something like "refs/tags/v1.2.3"
         # Make sure the package version is the same as the tag
-        grep -Rq "^Version: ${GITHUB_REF:11}$" cge_modeling.egg-info/PKG-INFO
+        grep -Rq "^Version: ${GITHUB_REF:11}$" tsdisagg.egg-info/PKG-INFO
     - name: Publish to PyPI
       run: |
         twine check dist/*

@@ -62,8 +62,7 @@ def build_conversion_matrix(
     )
     high_freq_df["low_freq_period"] = high_freq_df.index.to_period(freq=low_freq_period)
     period_to_row_idx = {
-        period: idx
-        for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))
+        period: idx for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))
     }
 
     C = np.zeros((n_low, n_high))
@@ -76,9 +75,7 @@ def build_conversion_matrix(
                 np.ndarray[int],
                 np.flatnonzero(high_freq_df.low_freq_period == low_freq_period),
             )
-            idx, fill_value = _get_C_index_and_fill(
-                idx, agg_func, time_conversion_factor
-            )
+            idx, fill_value = _get_C_index_and_fill(idx, agg_func, time_conversion_factor)
             C[row_idx, idx] = fill_value
 
     return C
@@ -87,9 +84,7 @@ def build_conversion_matrix(
 def log_likelihood(nl, CΣCT, ul):
     sign, log_det = np.linalg.slogdet(CΣCT)
 
-    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (
-        log_det + ul.T @ np.linalg.solve(CΣCT, ul)
-    )
+    return -nl / 2 * np.log(2 * np.pi) - 0.5 * (log_det + ul.T @ np.linalg.solve(CΣCT, ul))
 
 
 def build_difference_matrix(n, h=0):
@@ -166,9 +161,7 @@ def build_denton_covariance(n, C, X, h=1, criterion="proportional"):
     return Σ_D
 
 
-def build_denton_charlotte_distribution_matrix(
-    n, nl, C, X, h=1, criterion="proportional"
-):
+def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="proportional"):
     # Here is the Charlotte correction: slice off the top h rows of the difference matrix
     Δ = build_difference_matrix(n, h)[h:, :]
     if criterion == "proportional":
@@ -280,9 +273,7 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     low_name = get_frequency_name(low_freq)
     time_conversion_factor = FREQ_CONVERSION_FACTORS[low_name][high_name]
 
-    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(
-        df1_out, high_freq
-    )
+    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(df1_out, high_freq)
 
     if isinstance(df1_out, pd.Series):
         df1_out.name = low_freq_name
@@ -385,9 +376,7 @@ def disaggregate_series(
             f"Method should be one of 'denton', 'denton-cholette', 'chow-lin', 'litterman'. Got {method}."
         )
     if criterion not in ["proportional", "additive"]:
-        raise ValueError(
-            f"Criterion should be one of 'proportional', 'additive'. Got {criterion}"
-        )
+        raise ValueError(f"Criterion should be one of 'proportional', 'additive'. Got {criterion}")
     if agg_func not in ["mean", "sum", "first", "last"]:
         raise ValueError(
             f"agg_func should be one of 'mean', 'sum', 'first', 'last'. Got {agg_func}"
@@ -400,9 +389,7 @@ def disaggregate_series(
         low_freq_df, high_freq_df, target_freq, method
     )
 
-    C = build_conversion_matrix(
-        low_freq_df, high_freq_df, time_conversion_factor, agg_func
-    )
+    C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
     drop_rows = np.all(C == 0, axis=1)
     if any(drop_rows):
         dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
