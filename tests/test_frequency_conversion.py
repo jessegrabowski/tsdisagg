@@ -1,9 +1,10 @@
 import calendar
 import unittest
+
 from typing import Callable, List, Tuple
 
-import numpy as np
 import pandas as pd
+
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
@@ -15,7 +16,6 @@ from tsdisagg.ts_disagg import build_conversion_matrix, prepare_input_dataframes
 def freq(
     draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: List[str]
 ) -> Tuple[str, str, str]:
-
     bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
     suffixes = [f"-{x}" for x in suffix_list] + [""]
 
@@ -51,7 +51,9 @@ class TestPandasIndex(unittest.TestCase):
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
+        result = pd.merge(
+            low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
+        )
 
         df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
         self.assertEqual(df.shape[0], result.shape[0])
@@ -69,7 +71,9 @@ class TestPandasIndex(unittest.TestCase):
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
+        result = pd.merge(
+            low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
+        )
 
         df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
 
@@ -88,7 +92,9 @@ class TestPandasIndex(unittest.TestCase):
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
 
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
-        result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
+        result = pd.merge(
+            low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer"
+        )
 
         df, df_low, df_high, factor = prepare_input_dataframes(
             low_freq_df, None, target_freq, "denton"
@@ -116,10 +122,12 @@ def test_build_conversion_matrix():
         low_freq_df, high_freq_df, target_freq, "denton"
     )
 
-    y = df.iloc[:, 0].dropna().values
-    X = df.drop(columns=df.columns[0]).values
+    df.iloc[:, 0].dropna().values
+    df.drop(columns=df.columns[0]).values
 
-    C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func="sum")
+    C = build_conversion_matrix(
+        low_freq_df, high_freq_df, time_conversion_factor, agg_func="sum"
+    )
 
     assert C.shape[0] == low_freq_df.shape[0]
     assert C.shape[1] == high_freq_df.shape[0]
