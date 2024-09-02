@@ -395,8 +395,8 @@ def disaggregate_series(
     )
 
     C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
-
     drop_rows = np.all(C == 0, axis=1) | low_freq_df.isna().values.ravel()
+
     if any(drop_rows):
         dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
         warnings.warn(

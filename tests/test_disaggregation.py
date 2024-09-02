@@ -496,14 +496,19 @@ def test_invalid_dataframe_warnings():
         )
 
 
-@pytest.mark.parametrize("method", ["denton"])
-def test_disagg_with_internal_low_freq_missing(sales_a, exports_q, exports_m, method: METHOD):
+@pytest.mark.parametrize("method", ["denton", "chow-lin", "litterman"])
+@pytest.mark.parametrize("missing_in_center", [True, False])
+def test_disagg_with_internal_low_freq_missing(
+    sales_a, exports_q, exports_m, method: METHOD, missing_in_center
+):
     sales_a = sales_a.copy()
 
-    # Add a missing value to the middle of the series
-    sales_a.iloc[10] = np.nan
+    if missing_in_center:
+        sales_a.iloc[10] = np.nan
+    else:
+        sales_a.iloc[0] = np.nan
 
-    disaggregate_series(
+    result = disaggregate_series(
         sales_a,
         high_freq_df=exports_m.assign(Constant=1) if "denton" not in method else None,
         method=method,
@@ -512,6 +517,16 @@ def test_disagg_with_internal_low_freq_missing(sales_a, exports_q, exports_m, me
         optimizer_kwargs={"method": "nelder-mead"},
         verbose=False,
     )
+
+    assert result.isna().sum() == 0
+
+    if "denton" in method:
+        assert np.all(
+            result.index
+            == pd.date_range(start=sales_a.index[0], periods=12 * sales_a.shape[0], freq="MS")
+        )
+    else:
+        assert np.all(result.index == exports_m.index)
 
 
 if __name__ == "__main__":
