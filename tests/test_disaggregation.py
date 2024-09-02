@@ -12,7 +12,7 @@ from hypothesis.strategies import SearchStrategy, composite, integers
 
 from tsdisagg import disaggregate_series
 from tsdisagg.time_conversion import FREQ_CONVERSION_FACTORS, MONTHS, get_frequency_name
-from tsdisagg.ts_disagg import build_conversion_matrix
+from tsdisagg.ts_disagg import METHOD, build_conversion_matrix
 
 
 def generate_random_index_pair(
@@ -91,6 +91,39 @@ def frequencies(draw: Callable[[SearchStrategy[int]], int]) -> tuple[str, str]:
         high_freq += "-" + month
 
     return low_freq, high_freq
+
+
+@pytest.fixture()
+def exports_m():
+    exports_m = pd.read_csv("tests/data/exports_m.csv", index_col=0)
+    exports_m.index = pd.date_range(start="1972-01-01", freq="MS", periods=exports_m.shape[0])
+    exports_m.columns = ["exports"]
+    return exports_m
+
+
+@pytest.fixture()
+def sales_a():
+    sales_a = pd.read_csv("tests/data/sales_a.csv", index_col=0)
+    sales_a.index = pd.date_range(start="1975-01-01", freq="YS", periods=sales_a.shape[0])
+    sales_a.columns = ["sales"]
+    return sales_a
+
+
+@pytest.fixture()
+def exports_q():
+    exports_q = pd.read_csv("tests/data/exports_q.csv", index_col=0)
+    exports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=exports_q.shape[0])
+    exports_q.columns = ["exports"]
+    return exports_q
+
+
+@pytest.fixture()
+def imports_q():
+    imports_q = pd.read_csv("tests/data/imports_q.csv", index_col=0)
+    imports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=imports_q.shape[0])
+    imports_q.columns = ["imports"]
+
+    return imports_q
 
 
 @given(frequencies())
@@ -473,6 +506,24 @@ def test_invalid_dataframe_warnings():
             method="litterman",
             agg_func="sum",
         )
+
+
+@pytest.mark.parametrize("method", ["denton"])
+def test_disagg_with_internal_low_freq_missing(sales_a, exports_q, exports_m, method: METHOD):
+    sales_a = sales_a.copy()
+
+    # Add a missing value to the middle of the series
+    sales_a.iloc[10] = np.nan
+
+    disaggregate_series(
+        sales_a,
+        high_freq_df=exports_m.assign(Constant=1) if "denton" not in method else None,
+        method=method,
+        agg_func="sum",
+        target_freq="MS",
+        optimizer_kwargs={"method": "nelder-mead"},
+        verbose=False,
+    )
 
 
 if __name__ == "__main__":

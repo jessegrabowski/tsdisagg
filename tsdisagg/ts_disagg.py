@@ -218,8 +218,8 @@ def prepare_input_dataframes(low_freq_df, high_freq_df, target_freq, method):
             "No datetime index found on the dataframe passed as argument to low_freq_df."
         )
 
-    if low_freq_df.isna().any().any():
-        raise ValueError("low_freq_df has missing values.")
+    # if low_freq_df.isna().any().any():
+    #     raise ValueError("low_freq_df has missing values.")
 
     if high_freq_df is not None:
         if not isinstance(high_freq_df.index, pd.core.indexes.datetimes.DatetimeIndex):
@@ -395,7 +395,8 @@ def disaggregate_series(
     )
 
     C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
-    drop_rows = np.all(C == 0, axis=1)
+
+    drop_rows = np.all(C == 0, axis=1) | low_freq_df.isna().values.ravel()
     if any(drop_rows):
         dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
         warnings.warn(
@@ -403,7 +404,7 @@ def disaggregate_series(
             UserWarning,
         )
 
-    y = df.iloc[:, target_idx].dropna().loc[~drop_rows]
+    y = low_freq_df.loc[~drop_rows]
     C = C[~drop_rows, :]
     X = df.drop(columns=df.columns[target_idx])
 
