@@ -363,5 +363,117 @@ class DisaggregationTests(unittest.TestCase):
         self.assertEqual(expected, sales_m_litterman.to_frame())
 
 
+def test_invalid_dataframe_warnings():
+    with pytest.raises(
+        ValueError,
+        match="No datetime index found on the dataframe passed as argument to low_freq_df",
+    ):
+        disaggregate_series(
+            pd.DataFrame({"data": [1, 2, 3]}),
+            pd.DataFrame({"data": [1, 2, 3]}),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="No datetime index found on the dataframe passed as argument to high_freq_df",
+    ):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            pd.DataFrame({"data": [1, 2, 3]}),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(ValueError, match="low_freq_df has missing values"):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(ValueError, match="high_freq_df has missing values"):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            pd.DataFrame(
+                {"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Start date found on high frequency data 2020-01-01 is after start date "
+        "found on low frequency data 1999-01-01.",
+    ):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("1999-01-01", periods=3, freq="D")
+            ),
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="User provided target_freq does not match frequency information found on "
+        "indicator data.",
+    ):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
+            ),
+            method="denton",
+            agg_func="sum",
+            target_freq="M",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Indicator data high_freq_df does not have a valid time index with "
+        "frequency information",
+    ):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="M")
+            ),
+            pd.DataFrame(
+                {"data": [1, 2, 3]},
+                index=pd.to_datetime(["2020-01-01", "2020-03-04", "2020-12-06"]),
+            ),
+            method="denton",
+            agg_func="sum",
+        )
+
+    with pytest.raises(
+        ValueError, match='high_freq_df can only be None for methods "denton" and "denton-cholette"'
+    ):
+        disaggregate_series(
+            pd.DataFrame(
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="Q")
+            ),
+            None,
+            method="litterman",
+            agg_func="sum",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
