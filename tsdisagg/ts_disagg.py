@@ -210,58 +210,58 @@ def print_regression_report(y, X, params, std_β, C, method):
     print(f'{"sigma.sq":<15}{params[-1]:>10.4f}')
 
 
-def prepare_input_dataframes(df1, df2, target_freq, method):
-    df1_out = df1.copy()
+def prepare_input_dataframes(low_freq_df, high_freq_df, target_freq, method):
+    low_freq_df_out = low_freq_df.copy()
 
-    if not isinstance(df1.index, pd.core.indexes.datetimes.DatetimeIndex):
+    if not isinstance(low_freq_df.index, pd.core.indexes.datetimes.DatetimeIndex):
         raise ValueError(
             "No datetime index found on the dataframe passed as argument to low_freq_df."
         )
 
-    if df1.isna().any().any():
+    if low_freq_df.isna().any().any():
         raise ValueError("low_freq_df has missing values.")
 
-    if df2 is not None:
-        if not isinstance(df2.index, pd.core.indexes.datetimes.DatetimeIndex):
+    if high_freq_df is not None:
+        if not isinstance(high_freq_df.index, pd.core.indexes.datetimes.DatetimeIndex):
             raise ValueError(
-                "No datetime index found on the dataframe passed as argument to low_freq_df."
+                "No datetime index found on the dataframe passed as argument to high_freq_df."
             )
 
-        if df2.isna().any().any():
+        if high_freq_df.isna().any().any():
             raise ValueError("high_freq_df has missing values.")
 
-        if df2.index[0] > df1.index[0]:
+        if high_freq_df.index[0] > low_freq_df.index[0]:
             raise ValueError(
-                f"Start date found on high frequency data {df2.index[0]} is after start date found on "
-                f"low frequency data {df1.index[0]}. Interpolation is not possible in this case, because "
-                f"there is no observed high frequency data associated with the first "
-                f"{(df1.index < df2.index[0]).sum()} low-frequency observations. "
+                f"Start date found on high frequency data {high_freq_df.index[0].strftime('%Y-%m-%d')} is after start "
+                f"date found on low frequency data {low_freq_df.index[0].strftime('%Y-%m-%d')}. Interpolation is not "
+                f"possible in this case, because there is no observed high frequency data associated with the first "
+                f"{(low_freq_df.index < high_freq_df.index[0]).sum()} low-frequency observations. "
                 f"Align the start date of these two dataframes and try again."
             )
 
-        df2_out = df2.copy()
+        high_freq_df_out = high_freq_df.copy()
     else:
-        df2_out = df2
+        high_freq_df_out = high_freq_df
 
-    low_freq = df1_out.index.freq or df1_out.index.inferred_freq
+    low_freq = low_freq_df_out.index.freq or low_freq_df.index.inferred_freq
     if not low_freq:
         raise ValueError(
             "Low frequency dataframe does not have a valid time index with frequency information"
         )
 
-    if df2_out is None and target_freq is None:
+    if high_freq_df_out is None and target_freq is None:
         high_freq = auto_step_down_base_freq(low_freq)
-    elif df2_out is None and target_freq is not None:
+    elif high_freq_df_out is None and target_freq is not None:
         high_freq = target_freq
-    elif df2_out is not None and target_freq is not None:
-        if df2_out.index.inferred_freq != target_freq:
+    elif high_freq_df_out is not None and target_freq is not None:
+        if high_freq_df_out.index.inferred_freq != target_freq:
             raise ValueError(
                 "User provided target_freq does not match frequency information found on indicator data "
                 "high_freq_df."
             )
         high_freq = target_freq
     else:
-        high_freq = df2_out.index.inferred_freq
+        high_freq = high_freq_df_out.index.inferred_freq
         if not high_freq:
             raise ValueError(
                 "Indicator data high_freq_df does not have a valid time index with frequency information"
@@ -273,28 +273,30 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
     low_name = get_frequency_name(low_freq)
     time_conversion_factor = FREQ_CONVERSION_FACTORS[low_name][high_name]
 
-    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(df1_out, high_freq)
+    var_name, low_freq_name, high_freq_name = make_names_from_frequencies(
+        low_freq_df_out, high_freq
+    )
 
-    if isinstance(df1_out, pd.Series):
-        df1_out.name = low_freq_name
-    elif isinstance(df1_out, pd.DataFrame):
-        df1_out.rename(columns={var_name: low_freq_name}, inplace=True)
+    if isinstance(low_freq_df_out, pd.Series):
+        low_freq_df_out.name = low_freq_name
+    elif isinstance(low_freq_df_out, pd.DataFrame):
+        low_freq_df_out.rename(columns={var_name: low_freq_name}, inplace=True)
 
-    if df2_out is None and method in ["denton", "denton-cholette"]:
-        high_freq_idx = make_companion_index(df1_out, target_freq=high_freq)
-        df2_out = pd.Series(1, index=high_freq_idx, name=high_freq_name)
+    if high_freq_df_out is None and method in ["denton", "denton-cholette"]:
+        high_freq_idx = make_companion_index(low_freq_df_out, target_freq=high_freq)
+        high_freq_df_out = pd.Series(1, index=high_freq_idx, name=high_freq_name)
 
-    elif df2_out is None:
+    elif high_freq_df_out is None:
         raise ValueError(
             'high_freq_df can only be None for methods "denton" and "denton-cholette", otherwise a '
             "dataframe of high-frequency indicators must be provided."
         )
 
-    df1_out.index.freq = df1_out.index.inferred_freq
-    df2_out.index.freq = df2_out.index.inferred_freq
+    low_freq_df_out.index.freq = low_freq_df_out.index.inferred_freq
+    high_freq_df_out.index.freq = high_freq_df_out.index.inferred_freq
 
-    df = pd.merge(df1_out, df2_out, left_index=True, right_index=True, how="outer")
-    return df, df1_out, df2_out, time_conversion_factor
+    df = pd.merge(low_freq_df_out, high_freq_df_out, left_index=True, right_index=True, how="outer")
+    return df, low_freq_df_out, high_freq_df_out, time_conversion_factor
 
 
 def disaggregate_series(
