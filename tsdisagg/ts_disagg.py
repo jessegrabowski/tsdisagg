@@ -290,6 +290,9 @@ def prepare_input_dataframes(df1, df2, target_freq, method):
             "dataframe of high-frequency indicators must be provided."
         )
 
+    df1_out.index.freq = df1_out.index.inferred_freq
+    df2_out.index.freq = df2_out.index.inferred_freq
+
     df = pd.merge(df1_out, df2_out, left_index=True, right_index=True, how="outer")
     return df, df1_out, df2_out, time_conversion_factor
 

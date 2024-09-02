@@ -190,7 +190,6 @@ class DisaggregationTests(unittest.TestCase):
 
     def test_chow_lin_backcasting_error(self):
         # Test case for quarterly to monthly disaggregation backcasting error, issue #6
-
         expected = pd.read_csv("tests/data/R_Output_chow-lin_QtoM_2.csv")
 
         low_freq_data = pd.read_csv("tests/data/AL_Quarterly_Data_Modified.csv")
@@ -280,6 +279,29 @@ class DisaggregationTests(unittest.TestCase):
         )
 
         self.assertEqual(expected, sales_q_chow_lin.to_frame())
+
+    def test_chow_lin_no_freq(self):
+        expected = pd.read_csv("tests/data/R_output_chow_lin_two_indicator.csv", index_col=0)
+        expected.index = self.exports_q.index
+        expected.columns = ["sales"]
+
+        df2 = self.exports_q.merge(self.imports_q, left_index=True, right_index=True)
+
+        sales_nofreq = self.sales_a.copy()
+        sales_nofreq.index.freq = None
+        assert sales_nofreq.index.freq is None
+
+        sales_q_chow_lin = disaggregate_series(
+            sales_nofreq,
+            df2.resample("QS-OCT").first().assign(constant=1),
+            method="chow-lin",
+            agg_func="sum",
+            optimizer_kwargs={"method": "l-bfgs-b"},
+            verbose=True,
+        )
+
+        self.assertEqual(expected, sales_q_chow_lin.to_frame())
+        assert sales_q_chow_lin.index.freq == "QS-OCT"
 
     def test_denton(self):
         expected = pd.read_csv("tests/data/R_output_denton.csv", index_col=0)
