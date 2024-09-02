@@ -421,18 +421,6 @@ def test_invalid_dataframe_warnings():
             agg_func="sum",
         )
 
-    with pytest.raises(ValueError, match="low_freq_df has missing values"):
-        disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
-            method="denton",
-            agg_func="sum",
-        )
-
     with pytest.raises(ValueError, match="high_freq_df has missing values"):
         disaggregate_series(
             pd.DataFrame(

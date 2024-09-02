@@ -404,7 +404,7 @@ def disaggregate_series(
             UserWarning,
         )
 
-    y = low_freq_df.loc[~drop_rows]
+    y = low_freq_df.loc[~drop_rows].squeeze()
     C = C[~drop_rows, :]
     X = df.drop(columns=df.columns[target_idx])
 
@@ -464,7 +464,16 @@ def disaggregate_series(
     ul = y - C @ p
     y_hat = p + D @ ul
 
-    output = pd.Series(y_hat, index=df.index, name=target_column)
+    if not isinstance(y_hat, pd.Series | pd.DataFrame):
+        output = pd.Series(y_hat, index=df.index, name=target_column)
+    elif isinstance(y_hat, pd.Series):
+        output = y_hat
+        output.name = target_column
+    else:
+        output = y_hat.iloc[:, 0]
+        output.name = target_column
+
+    output.index = df.index
     output.index.freq = output.index.inferred_freq
 
     if return_optim_res and result is not None:
