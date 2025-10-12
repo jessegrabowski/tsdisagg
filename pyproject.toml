@@ -1,7 +1,7 @@
 [project]
 name = "tsdisagg"
 dynamic = ['version']
-description = "Statistical tools for converting low frequency time series data to higher frequencies"
+description = "Temporal Disaggregation of Time Series Data in Python"
 readme = 'README.md'
 license = { file = 'LICENSE'}
 authors = [{name = "Jesse Grabowski", email="jessegrabowski@gmail.com"}]
