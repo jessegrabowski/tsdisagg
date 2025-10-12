@@ -452,7 +452,7 @@ def test_invalid_dataframe_warnings():
     ):
         disaggregate_series(
             pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="M")
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="ME")
             ),
             pd.DataFrame(
                 {"data": [1, 2, 3]},
@@ -467,7 +467,7 @@ def test_invalid_dataframe_warnings():
     ):
         disaggregate_series(
             pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="Q")
+                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="QE")
             ),
             None,
             method="litterman",
