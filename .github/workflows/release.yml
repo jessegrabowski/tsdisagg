@@ -47,10 +47,10 @@ jobs:
 
   publish:
     name: upload release to PyPI
-    needs: [build]
+    needs: build
     runs-on: ubuntu-latest
-    env:
-      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+    permissions:
+      id-token: write
     if: github.event_name == 'release' && github.event.action == 'published'
     environment: release
     steps:
@@ -59,10 +59,6 @@ jobs:
           name: artifact
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
-      - name: Publish to PyPI
-        run: |
-          twine check dist/*
-          twine upload --repository pypi --username __token__ --password ${PYPI_TOKEN} dist/*
 
   check-published:
     needs: publish
@@ -73,7 +69,7 @@ jobs:
       with:
         python-version: 3.12
     - name: Give PyPI a chance to update the index
-      run: sleep 240
+      run: sleep 360
     - name: Install from PyPI
       run: |
         pip install tsdisagg==${GITHUB_REF:11}
