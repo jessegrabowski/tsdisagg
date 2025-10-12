@@ -14,13 +14,20 @@ MONTHS = [
     "NOV",
     "DEC",
 ]
+
+FEBRUARY = 2
+APRIL = 4
+JUNE = 6
+SEPTEMBER = 9
+NOVEMBER = 11
+
+THIRTY_DAY_MONTHS = [APRIL, JUNE, SEPTEMBER, NOVEMBER]
+
 YEARLY_FREQS = ["YE", "BYE", "YS", "BYS"]
 QUARTERLY_FREQS = ["QE", "BQE", "QS", "BQS"]
 
 VALID_YEARLY = YEARLY_FREQS + [f"{freq}-{month}" for freq in YEARLY_FREQS for month in MONTHS]
-VALID_QUARTERLY = QUARTERLY_FREQS + [
-    f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS
-]
+VALID_QUARTERLY = QUARTERLY_FREQS + [f"{freq}-{month}" for freq in QUARTERLY_FREQS for month in MONTHS]
 VALID_MONTHLY = ["ME", "MS", "BME", "BMS"]
 
 MONTHS_IN_YEAR = 12
@@ -60,15 +67,17 @@ def is_monthly_freq(freq_str):
     return freq_str in VALID_MONTHLY
 
 
+def is_leap_year(year: int) -> bool:
+    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+
+
 VALIDATE_FUNCS = [is_annual_freq, is_quarterly_freq, is_monthly_freq]
 
 
 def validate_freqs(*freqs):
     for freq in freqs:
-        if not any([f(freq) for f in VALIDATE_FUNCS]):
-            raise NotImplementedError(
-                f"Only annual, quarterly and monthly frequencies are supported, found {freq}"
-            )
+        if not any(f(freq) for f in VALIDATE_FUNCS):
+            raise NotImplementedError(f"Only annual, quarterly and monthly frequencies are supported, found {freq}")
 
 
 def get_frequency_name(freq):
@@ -104,9 +113,7 @@ def auto_step_down_base_freq(freq):
     return new_base + "-" + suffix
 
 
-def get_high_freq_endpoints(
-    endpoint_date, low_freq_name, high_freq_name, target_freq, mode="start"
-):
+def get_high_freq_endpoints(endpoint_date, low_freq_name, high_freq_name, target_freq, mode="start"):
     freq_base = target_freq.split("-")[0]
 
     # If it's a start-of-month business calendar, it can end up that the high_freq_start is not the correct date
@@ -152,14 +159,15 @@ def get_high_freq_endpoints(
                     shift = max(min(end_day + 1, 1), 6)
                     high_freq_end += pd.DateOffset(days=shift)
         return high_freq_end
+    return None
 
 
 def get_last_day(month, year):
-    if month == 2:
-        if year % 4 == 0:
+    if month == FEBRUARY:
+        if is_leap_year(year):
             return 29
         return 28
-    if month in [4, 6, 9, 11]:
+    if month in THIRTY_DAY_MONTHS:
         return 30
 
     return 31

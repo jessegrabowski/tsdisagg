@@ -17,9 +17,7 @@ from tsdisagg.time_conversion import (
 
 
 @composite
-def freq(
-    draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]
-) -> tuple[str, str, bool]:
+def freq(draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]) -> tuple[str, str, bool]:
     bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
     suffixes = [f"-{x}" for x in suffix_list]
 

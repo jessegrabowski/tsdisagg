@@ -43,9 +43,7 @@ def test_GLM_estimator():
     # From tempdisagg:::CalcGLS, rho = 0.95
     expected = np.array([908.6679748, 0.9772889])
 
-    low_freq_data = pd.read_csv(
-        "tests/data/AL_Annual_Data_Shorter.csv", parse_dates=True, index_col="period"
-    ).dropna()
+    low_freq_data = pd.read_csv("tests/data/AL_Annual_Data_Shorter.csv", parse_dates=True, index_col="period").dropna()
     low_freq_data.index.freq = low_freq_data.index.inferred_freq
     high_freq_data = pd.read_csv(
         "tests/data/AL_Quarterly_Data_Modified.csv",
