@@ -1,47 +1,75 @@
 name: release-pipeline
 
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   release:
-    types:
-      - created
+    types: [published]
 
 jobs:
-  release-job:
+  build:
     runs-on: ubuntu-latest
-    env:
-      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+    - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: 3.11
-    - name: Install release tooling
+    - name: Build the sdist and the wheel
       run: |
-        pip install twine wheel numpy setuptools versioneer
-    - name: Build package
+        pip install build
+        python3 -m build
+    - name: Check the sdist installs and imports
       run: |
-        python setup.py sdist bdist_wheel
-    - name: Check version number match
+          mkdir -p test-sdist
+          cd test-sdist
+          python -m venv venv-sdist
+          venv-sdist/bin/python -m pip install numpy
+          venv-sdist/bin/python -m pip install ../dist/tsdisagg*.tar.gz
+          echo "Checking import and version number (on release)"
+          venv-sdist/bin/python -c "import tsdisagg as ts; assert ts.__version__ == '${{ github.ref_name }}'[1:] if '${{ github.ref_type }}' == 'tag' else True; print(ts.__version__)"
+          cd ..
+    - name: Check the bdist installs and imports
       run: |
-        echo "GITHUB_REF: ${GITHUB_REF}"
-        # The GITHUB_REF should be something like "refs/tags/v1.2.3"
-        # Make sure the package version is the same as the tag
-        grep -Rq "^Version: ${GITHUB_REF:11}$" tsdisagg.egg-info/PKG-INFO
-    - name: Publish to PyPI
-      run: |
-        twine check dist/*
-        twine upload --repository pypi --username __token__ --password ${PYPI_TOKEN} dist/*
-  test-install-job:
-    needs: release-job
+            mkdir -p test-bdist
+            cd test-bdist
+            python -m venv venv-bdist
+            venv-bdist/bin/python -m pip install ../dist/tsdisagg*.whl
+            echo "Checking import and version number (on release)"
+            venv-bdist/bin/python -c "import tsdisagg as ts; assert ts.__version__ == '${{ github.ref_name }}'[1:] if '${{ github.ref_type }}' == 'tag' else ts.__version__; print(ts.__version__)"
+            cd ..
+    - uses: actions/upload-artifact@v4
+      with:
+        name: artifact
+        path: dist/*
+
+  publish:
+    name: upload release to PyPI
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifact
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  check-published:
+    needs: [publish]
     runs-on: ubuntu-latest
     steps:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: 3.7
+        python-version: 3.12
     - name: Give PyPI a chance to update the index
-      run: sleep 240
+      run: sleep 360
     - name: Install from PyPI
       run: |
         pip install tsdisagg==${GITHUB_REF:11}
