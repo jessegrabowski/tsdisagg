@@ -51,7 +51,7 @@ jobs:
 
     - name: Install tsdisagg
       run: |
-        pip install -e .
+        pip install -e ".[dev]"
         python --version
         pip check
 

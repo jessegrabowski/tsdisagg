@@ -1,0 +1,16 @@
+name: tsdisagg-dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  # Core dependencies
+  - numpy
+  - scipy
+  - pandas
+
+  # developer tools
+  - pre-commit
+  - pytest
+  - pytest-cov
+  - hypothesis

@@ -1,27 +1,9 @@
 name: tsdisagg-test
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
   # Core dependencies
   - numpy
   - scipy
   - pandas
-  - numba
-  - matplotlib
-
-  # code style
-  - pre-commit
-  - black
-  - isort
-
-  # For linting
-  - flake8
-  - pep8
-  - pyflakes
-
-  # developer tools
-  - pre-commit
-  - pytest
-  - pytest-cov
-  - hypothesis
-  - versioneer
