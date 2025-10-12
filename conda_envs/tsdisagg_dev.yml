@@ -14,4 +14,3 @@ dependencies:
   - pytest
   - pytest-cov
   - hypothesis
-  - versioneer
