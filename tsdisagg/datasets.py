@@ -13,17 +13,13 @@ DATASETS = {
 
 
 def here(path: Path) -> Path:
-    """
-    Find the path to current project's root directory, defined as where the .git folder is located.
-    """
+    """Find the path to current project's root directory, defined as where the .git folder is located."""
     location = Path(__file__).absolute()
     for parent in location.parents:
         if (parent / ".git").exists():
             return parent / path
 
-    raise RuntimeError(
-        "Could not find the project root directory -- no .git folder found in any parent directories."
-    )
+    raise RuntimeError("Could not find the project root directory -- no .git folder found in any parent directories.")
 
 
 def load_data(dataset: str, backend: str = "pandas") -> pd.DataFrame:

@@ -36,7 +36,8 @@ def generate_random_index_pair(
     low_periods : int, default 5
         Number of periods for the low-frequency DatetimeIndex.
     high_periods : int, optional
-        Number of periods for the high-frequency DatetimeIndex. If None, it will be calculated based on the low-frequency range.
+        Number of periods for the high-frequency DatetimeIndex. If None, it will be calculated based on the
+        low-frequency range.
     start : str or pd.Timestamp, optional
         The start date for the index. If None, a random start date within a reasonable range will be chosen.
 
@@ -46,7 +47,8 @@ def generate_random_index_pair(
         A tuple containing the low-frequency and high-frequency DatetimeIndexes.
     """
     if start is None:
-        start = pd.Timestamp.now().normalize() - pd.DateOffset(years=np.random.randint(0, 30))
+        rng = np.random.default_rng()
+        start = pd.Timestamp.now().normalize() - pd.DateOffset(years=rng.integers(0, 30))
 
     low_freq_index = pd.date_range(start=start, periods=low_periods, freq=low_freq)
     high_freq = pd._libs.tslibs.to_offset(high_freq)
@@ -97,9 +99,7 @@ def frequencies(draw: Callable[[SearchStrategy[int]], int]) -> tuple[str, str]:
 @pytest.mark.parametrize("agg_func", ["sum", "mean", "first", "last"])
 def test_build_C_matrix(agg_func, frequencies):
     low_freq, high_freq = frequencies
-    df_low, df_high = generate_random_index_pair(
-        low_freq, high_freq, extra_high_freq_start=0, extra_high_freq_end=0
-    )
+    df_low, df_high = generate_random_index_pair(low_freq, high_freq, extra_high_freq_start=0, extra_high_freq_end=0)
 
     high_name = get_frequency_name(high_freq)
     low_name = get_frequency_name(low_freq)
@@ -149,27 +149,19 @@ class DisaggregationTests(unittest.TestCase):
     def setUp(self):
         self.addTypeEqualityFunc(pd.DataFrame, self.assertDataframeEqual)
         self.exports_m = pd.read_csv("tests/data/exports_m.csv", index_col=0)
-        self.exports_m.index = pd.date_range(
-            start="1972-01-01", freq="MS", periods=self.exports_m.shape[0]
-        )
+        self.exports_m.index = pd.date_range(start="1972-01-01", freq="MS", periods=self.exports_m.shape[0])
         self.exports_m.columns = ["exports"]
 
         self.sales_a = pd.read_csv("tests/data/sales_a.csv", index_col=0)
-        self.sales_a.index = pd.date_range(
-            start="1975-01-01", freq="YS", periods=self.sales_a.shape[0]
-        )
+        self.sales_a.index = pd.date_range(start="1975-01-01", freq="YS", periods=self.sales_a.shape[0])
         self.sales_a.columns = ["sales"]
 
         self.exports_q = pd.read_csv("tests/data/exports_q.csv", index_col=0)
-        self.exports_q.index = pd.date_range(
-            start="1972-01-01", freq="QS-OCT", periods=self.exports_q.shape[0]
-        )
+        self.exports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=self.exports_q.shape[0])
         self.exports_q.columns = ["exports"]
 
         self.imports_q = pd.read_csv("tests/data/imports_q.csv", index_col=0)
-        self.imports_q.index = pd.date_range(
-            start="1972-01-01", freq="QS-OCT", periods=self.exports_q.shape[0]
-        )
+        self.imports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=self.exports_q.shape[0])
         self.imports_q.columns = ["imports"]
 
     def test_chow_lin(self):
@@ -226,11 +218,7 @@ class DisaggregationTests(unittest.TestCase):
         expected["index"] = (
             expected["index"]
             .str.replace(" Q", "-")
-            .map(
-                lambda x: pd.Period(
-                    year=int(x.split("-")[0]), quarter=int(x.split("-")[-1]), freq="Q"
-                ).start_time
-            )
+            .map(lambda x: pd.Period(year=int(x.split("-")[0]), quarter=int(x.split("-")[-1]), freq="Q").start_time)
         )
 
         expected = expected.set_index("index").resample("QS-DEC").last()
@@ -380,9 +368,7 @@ def test_invalid_dataframe_warnings():
         match="No datetime index found on the dataframe passed as argument to high_freq_df",
     ):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
             pd.DataFrame({"data": [1, 2, 3]}),
             method="denton",
             agg_func="sum",
@@ -390,24 +376,16 @@ def test_invalid_dataframe_warnings():
 
     with pytest.raises(ValueError, match="low_freq_df has missing values"):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
+            pd.DataFrame({"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
             method="denton",
             agg_func="sum",
         )
 
     with pytest.raises(ValueError, match="high_freq_df has missing values"):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
-            pd.DataFrame(
-                {"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
+            pd.DataFrame({"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
             method="denton",
             agg_func="sum",
         )
@@ -418,28 +396,19 @@ def test_invalid_dataframe_warnings():
         "found on low frequency data 1999-01-01.",
     ):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("1999-01-01", periods=3, freq="D")
-            ),
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("1999-01-01", periods=3, freq="D")),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
             method="denton",
             agg_func="sum",
         )
 
     with pytest.raises(
         ValueError,
-        match="User provided target_freq does not match frequency information found on "
-        "indicator data.",
+        match="User provided target_freq does not match frequency information found on " "indicator data.",
     ):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
             method="denton",
             agg_func="sum",
             target_freq="M",
@@ -447,13 +416,10 @@ def test_invalid_dataframe_warnings():
 
     with pytest.raises(
         ValueError,
-        match="Indicator data high_freq_df does not have a valid time index with "
-        "frequency information",
+        match="Indicator data high_freq_df does not have a valid time index with " "frequency information",
     ):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="ME")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="ME")),
             pd.DataFrame(
                 {"data": [1, 2, 3]},
                 index=pd.to_datetime(["2020-01-01", "2020-03-04", "2020-12-06"]),
@@ -462,13 +428,9 @@ def test_invalid_dataframe_warnings():
             agg_func="sum",
         )
 
-    with pytest.raises(
-        ValueError, match='high_freq_df can only be None for methods "denton" and "denton-cholette"'
-    ):
+    with pytest.raises(ValueError, match='high_freq_df can only be None for methods "denton" and "denton-cholette"'):
         disaggregate_series(
-            pd.DataFrame(
-                {"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="QE")
-            ),
+            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="QE")),
             None,
             method="litterman",
             agg_func="sum",

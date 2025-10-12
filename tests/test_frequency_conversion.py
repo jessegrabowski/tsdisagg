@@ -13,9 +13,7 @@ from tsdisagg.ts_disagg import build_conversion_matrix, prepare_input_dataframes
 
 
 @composite
-def freq(
-    draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]
-) -> tuple[str, str, str]:
+def freq(draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: list[str]) -> tuple[str, str, str]:
     bases = [f"{base}E", f"B{base}E", f"{base}S", f"B{base}S"]
     suffixes = [f"-{x}" for x in suffix_list] + [""]
 
@@ -44,9 +42,7 @@ class TestPandasIndex(unittest.TestCase):
         freq = base + suffix
         target_freq = base.replace("Y", "Q") + suffix
 
-        low_freq_df = pd.Series(
-            1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"
-        )
+        low_freq_df = pd.Series(1, index=pd.date_range(start_date, freq=freq, periods=20), name="test")
         index = make_companion_index(low_freq_df, target_freq)
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
 
@@ -62,9 +58,7 @@ class TestPandasIndex(unittest.TestCase):
         freq = base + suffix
         target_freq = base.replace("Y", "M")
 
-        low_freq_df = pd.Series(
-            1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"
-        )
+        low_freq_df = pd.Series(1, index=pd.date_range(start_date, freq=freq, periods=20), name="test")
         index = make_companion_index(low_freq_df, target_freq)
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
 
@@ -80,9 +74,7 @@ class TestPandasIndex(unittest.TestCase):
         target_freq = "MS"
         start_date = "1900-01-01"
 
-        low_freq_df = pd.Series(
-            1, index=pd.date_range(start_date, freq=freq, periods=20), name="test"
-        ).iloc[:-2]
+        low_freq_df = pd.Series(1, index=pd.date_range(start_date, freq=freq, periods=20), name="test").iloc[:-2]
 
         index = make_companion_index(low_freq_df, target_freq)
         low_freq_name, high_freq_name = get_frequency_names(low_freq_df, target_freq)
@@ -90,9 +82,7 @@ class TestPandasIndex(unittest.TestCase):
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
         result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
 
-        df, df_low, df_high, factor = prepare_input_dataframes(
-            low_freq_df, None, target_freq, "denton"
-        )
+        df, df_low, df_high, factor = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
         self.assertEqual(df.shape[0], result.shape[0])
 
 
@@ -103,9 +93,7 @@ def test_build_conversion_matrix():
     hf_start_date = "1995-03-01"
     end_date = "2001-12-01"
 
-    low_freq_df = pd.Series(
-        1, index=pd.date_range(lf_start_date, end_date, freq=freq), name="low_freq"
-    )
+    low_freq_df = pd.Series(1, index=pd.date_range(lf_start_date, end_date, freq=freq), name="low_freq")
     high_freq_df = pd.Series(
         1,
         index=pd.date_range(hf_start_date, end_date, freq=target_freq),
@@ -116,15 +104,10 @@ def test_build_conversion_matrix():
         low_freq_df, high_freq_df, target_freq, "denton"
     )
 
-    df.iloc[:, 0].dropna().values
-    df.drop(columns=df.columns[0]).values
-
     C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func="sum")
 
     assert C.shape[0] == low_freq_df.shape[0]
     assert C.shape[1] == high_freq_df.shape[0]
-
-    print(C @ high_freq_df)
 
 
 if __name__ == "__main__":
