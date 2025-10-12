@@ -353,7 +353,7 @@ class DisaggregationTests(unittest.TestCase):
 
 def test_invalid_dataframe_warnings():
     with pytest.raises(
-        ValueError,
+        TypeError,
         match="No datetime index found on the dataframe passed as argument to low_freq_df",
     ):
         disaggregate_series(

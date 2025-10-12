@@ -52,7 +52,7 @@ dev = [
 source = 'vcs'
 
 [tool.hatch.build.hooks.vcs]
-version-file = "tsidsagg/_version.py"
+version-file = "tsdisagg/_version.py"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -145,7 +145,7 @@ lines-between-types = 1
 'tests/*.py' = [
     'F401', # Unused import warning for test files -- this check removes imports of fixtures
     'F811',  # Redefine while unused -- this check fails on imported fixtures
-    'F841', # Unused variable warning for test files -- common in pymc model declarations
+    'F841', # Unused variable warning for test files
     'D106',  # Missing docstring for public method -- unittest test subclasses don't need docstrings
     "PLR2004", # Allow magic numbers in test files
     "E741", # Allow single letter variable names in test files

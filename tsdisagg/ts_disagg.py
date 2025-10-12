@@ -168,6 +168,7 @@ def build_denton_charlotte_distribution_matrix(n, nl, C, X, h=1, criterion="prop
 
 
 def _compute_D_and_p(method, y, X, C, n, nl, k, h, criterion, optimizer_kwargs, verbose):
+    result = None
     if method == "denton":
         assert k == 1
         Σ = build_denton_covariance(n, C, X.values, h, criterion)
@@ -217,7 +218,7 @@ def _compute_D_and_p(method, y, X, C, n, nl, k, h, criterion, optimizer_kwargs, 
         p = X.values @ β
         D = build_distribution_matrix(Σ, C)
 
-    return D, p
+    return D, p, result
 
 
 def print_regression_report(y, X, params, std_β, C, method):
@@ -436,9 +437,8 @@ def disaggregate_series(
 
     n, k = X.shape
     nl = y.shape[0]
-    result = None
 
-    D, p = _compute_D_and_p(method, y, X, C, n, nl, k, h, criterion, optimizer_kwargs, verbose)
+    D, p, result = _compute_D_and_p(method, y, X, C, n, nl, k, h, criterion, optimizer_kwargs, verbose)
 
     ul = y - C @ p
     y_hat = p + D @ ul
