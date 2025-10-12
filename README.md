@@ -26,10 +26,58 @@ Multiseries, regression-based methods:
 
 
 ## Examples
-For example usage, please see the `examples.ipynb` notebook. `tsdisagg` depends heavily on `pandas` to handle time reindexing, so the user is advised to read the associated Pandas documentation, especially as it relates to setting frequencies.
+
+Disaggregate a timeseries using the univariate Denton-Cholette method:
+```python
+import pandas as pd
+from tsdisagg import disaggregate_series
+from tsdisagg.datasets import load_data
+
+# Load example data
+sales_a = load_data("annual_sales")
 
 
-## To-do:
-1. Refactor codebase to use `statsmodels` model and results objects, as well as `.fit()` api
-2. Add missing interpolation methods relative to `timedisagg` (Fernandez, min RSS objective functions)
-3. Add support for finer time frequencies (weekly, daily, hourly)
+# Disaggregate from annual to quarterly using Denton-Cholette method
+sales_q_dc = disaggregate_series(
+    sales_a.resample("YS").last(), # Use `.resample` to ensure the frequency is set correctly
+    target_freq="QS", # Desired output frequency
+    method="denton-cholette", # Disaggregation method
+    agg_func="sum", # Sales are flow data, so we want the quarters to sum back to the annual data
+    h=1, # Differencing order (1 in this case to preserve the trend)
+)
+```
+
+Disaggregate a timeseries using the multivariate Chow-Lin method with an indicator series:
+```python
+import pandas as pd
+from tsdisagg import disaggregate_series
+from tsdisagg.datasets import load_data
+
+# Load example data
+sales_a = load_data("annual_sales")
+exports_q = load_data("quarterly_exports")
+
+# Disaggregate from annual to quarterly using Chow-Lin method with quarterly sales as indicator
+sales_q_chow_lin = disaggregate_series(
+    sales_a.resample("YS").last(), # Target series, annual frequency
+    exports_q.assign(intercept=1), # Indicator matrix. We can have as many series as we want here; so we use
+                                   # Exports at quarterly frequency, plus a deterministic intercept term.
+    method="chow-lin", # Disaggregation method
+    agg_func="sum", # Sales are flow data, so we want the quarters to sum back to the annual data
+    optimizer_kwargs={"method": "powell"}, # Additional arguments to the optimizer
+)
+```
+
+# Citing `tsdisagg`
+If you use `tsdisagg` in your research, please use the following citation:
+
+```bibtex
+@software{tsdisagg,
+author = {Jesse Grabowski},
+title = {tsdisagg: Temporal Disaggregation of Time Series Data in Python},
+version = {0.1.0},
+url = {https://github.com/jessegrabowski/tsdisagg},
+howpublished = {GitHub},
+year = {2025},
+}
+```
