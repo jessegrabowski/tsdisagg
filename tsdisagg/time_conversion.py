@@ -35,16 +35,24 @@ MONTHS_IN_QUARTER = 3
 QUARTERS_IN_YEAR = 4
 
 FREQ_CONVERSION_FACTORS = {
-    "yearly": {"monthly": MONTHS_IN_YEAR, "quarterly": QUARTERS_IN_YEAR},
-    "quarterly": {"monthly": MONTHS_IN_QUARTER},
+    "yearly": {"yearly": 1, "monthly": MONTHS_IN_YEAR, "quarterly": QUARTERS_IN_YEAR},
+    "quarterly": {"quarterly": 1, "monthly": MONTHS_IN_QUARTER},
+    "monthly": {"monthly": 1},
 }
 
 OFFSET_CONVERSIONS = {
     "yearly": {
+        "yearly": {"years": 0},
         "monthly": {"months": MONTHS_IN_YEAR - 1},
         "quarterly": {"months": (QUARTERS_IN_YEAR - 1) * MONTHS_IN_QUARTER},
     },
-    "quarterly": {"monthly": {"months": MONTHS_IN_QUARTER - 1}},
+    "quarterly": {
+        "quarterly": {"months": 0},
+        "monthly": {"months": MONTHS_IN_QUARTER - 1},
+    },
+    "monthly": {
+        "monthly": {"months": 0},
+    },
 }
 
 LONG_FREQ_TO_CODE = {"yearly": "Y", "quarterly": "Q", "monthly": "M"}
@@ -233,7 +241,7 @@ def make_companion_index(df, target_freq):
     low_freq = df.index.freq or df.index.inferred_freq
     low_freq_name, high_freq_name = get_frequency_names(df, target_freq)
 
-    if not FREQ_TO_ORDER[low_freq_name] > FREQ_TO_ORDER[high_freq_name]:
+    if not FREQ_TO_ORDER[low_freq_name] >= FREQ_TO_ORDER[high_freq_name]:
         raise ValueError(
             f"target_freq must be of higher frequency than the frequency on the data. Found "
             f"target_freq {target_freq}, which is {high_freq_name}, while data is {low_freq.name}, "

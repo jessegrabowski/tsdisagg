@@ -11,6 +11,7 @@ from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
 from tsdisagg import disaggregate_series
+from tsdisagg.datasets import load_data
 from tsdisagg.time_conversion import FREQ_CONVERSION_FACTORS, MONTHS, get_frequency_name
 from tsdisagg.ts_disagg import METHOD, build_conversion_matrix
 
@@ -97,35 +98,22 @@ def frequencies(draw: Callable[[SearchStrategy[int]], int]) -> tuple[str, str]:
 
 @pytest.fixture()
 def exports_m():
-    exports_m = pd.read_csv("tests/data/exports_m.csv", index_col=0)
-    exports_m.index = pd.date_range(start="1972-01-01", freq="MS", periods=exports_m.shape[0])
-    exports_m.columns = ["exports"]
-    return exports_m
+    return load_data("monthly_exports")
 
 
 @pytest.fixture()
 def sales_a():
-    sales_a = pd.read_csv("tests/data/sales_a.csv", index_col=0)
-    sales_a.index = pd.date_range(start="1975-01-01", freq="YS", periods=sales_a.shape[0])
-    sales_a.columns = ["sales"]
-    return sales_a
+    return load_data("annual_sales")
 
 
 @pytest.fixture()
 def exports_q():
-    exports_q = pd.read_csv("tests/data/exports_q.csv", index_col=0)
-    exports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=exports_q.shape[0])
-    exports_q.columns = ["exports"]
-    return exports_q
+    return load_data("quarterly_exports")
 
 
 @pytest.fixture()
 def imports_q():
-    imports_q = pd.read_csv("tests/data/imports_q.csv", index_col=0)
-    imports_q.index = pd.date_range(start="1972-01-01", freq="QS-OCT", periods=imports_q.shape[0])
-    imports_q.columns = ["imports"]
-
-    return imports_q
+    return load_data("quarterly_imports")
 
 
 @given(frequencies())
@@ -472,9 +460,7 @@ def test_invalid_dataframe_warnings():
 
 @pytest.mark.parametrize("method", ["denton", "chow-lin", "litterman"])
 @pytest.mark.parametrize("missing_in_center", [True, False])
-def test_disagg_with_internal_low_freq_missing(
-    sales_a, exports_q, exports_m, method: METHOD, missing_in_center
-):
+def test_disagg_with_internal_low_freq_missing(sales_a, exports_m, method: METHOD, missing_in_center):
     sales_a = sales_a.copy()
 
     if missing_in_center:
@@ -495,10 +481,7 @@ def test_disagg_with_internal_low_freq_missing(
     assert result.isna().sum() == 0
 
     if "denton" in method:
-        assert np.all(
-            result.index
-            == pd.date_range(start=sales_a.index[0], periods=12 * sales_a.shape[0], freq="MS")
-        )
+        assert np.all(result.index == pd.date_range(start=sales_a.index[0], periods=12 * sales_a.shape[0], freq="MS"))
     else:
         assert np.all(result.index == exports_m.index)
 

@@ -57,7 +57,15 @@ def build_conversion_matrix(
     low_index, high_index = low_freq_df.index, high_freq_df.index
     low_freq, _high_freq = low_index.freq, high_index.freq
 
-    low_freq_period = "Y" if low_freq.name.startswith("Y") or low_freq.name.startswith("BY") else "Q"
+    if low_freq.name.startswith("Y") or low_freq.name.startswith("BY"):
+        low_freq_period = "Y"
+    elif low_freq.name.startswith("Q"):
+        low_freq_period = "Q"
+    elif low_freq.name.startswith("M"):
+        low_freq_period = "M"
+    else:
+        raise ValueError(f"Unknown low_freq: {low_freq.name}. Expected yearly, quarterly or monthly frequency.")
+
     high_freq_df["low_freq_period"] = high_freq_df.index.to_period(freq=low_freq_period)
     period_to_row_idx = {period: idx for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))}
 
