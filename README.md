@@ -8,8 +8,17 @@ In addition, regression-based methods are also implemented that allow the user t
 If you have any questions or issues, please open a thread. Pull requests to add features or fix bugs are welcome. Please clone the repository locally to have access to the testing suite.
 
 ## Installation
-To install, use
-`pip install tsdisagg`
+`tsdisagg` is distributed on `conda-forge`. To install, use conda/mamba:
+
+```
+conda install -c conda-forge tsdisagg
+```
+
+Or, of course, you can install using pip:
+
+```
+pip install tsdisagg
+```
 
 ## Current Features
 Currently, only conversion between yearly, quarterly, and monthly data is supported. Conversion to lower frequencies is non-trivial due to the calendar math that needs to be added, but this is on my to-do list.
