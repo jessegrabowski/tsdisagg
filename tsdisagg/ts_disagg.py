@@ -59,7 +59,7 @@ def build_conversion_matrix(
 
     if low_freq.name.startswith("Y") or low_freq.name.startswith("BY"):
         low_freq_period = "Y"
-    elif low_freq.name.startswith("Q"):
+    elif low_freq.name.startswith("Q") or low_freq.name.startswith("BQ"):
         low_freq_period = "Q"
     elif low_freq.name.startswith("M"):
         low_freq_period = "M"
