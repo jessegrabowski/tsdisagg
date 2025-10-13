@@ -3,7 +3,9 @@ import unittest
 
 from collections.abc import Callable
 
+import numpy as np
 import pandas as pd
+import pytest
 
 from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
@@ -35,7 +37,7 @@ def freq(draw: Callable[[SearchStrategy[int]], int], base: str, suffix_list: lis
     return base_freq, suffix, start_date
 
 
-class TestPandasIndex(unittest.TestCase):
+class TestPandasIndex:
     @given(freq(base="Y", suffix_list=MONTHS))
     def test_dataframe_merge(self, params):
         base, suffix, start_date = params
@@ -50,10 +52,10 @@ class TestPandasIndex(unittest.TestCase):
         result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
 
         df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
-        self.assertEqual(df.shape[0], result.shape[0])
+        assert df.shape[0] == result.shape[0]
 
     @given(freq(base="Y", suffix_list=MONTHS))
-    def test_dataframe_merge_A_to_M(self, params):
+    def test_dataframe_merge_Y_to_M(self, params):
         base, suffix, start_date = params
         freq = base + suffix
         target_freq = base.replace("Y", "M")
@@ -67,11 +69,14 @@ class TestPandasIndex(unittest.TestCase):
 
         df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
 
-        self.assertEqual(df.shape[0], result.shape[0])
+        assert df.shape[0] == result.shape[0]
 
-    def test_dataframe_merge_Q_to_M(self):
-        freq = "QS"
-        target_freq = "MS"
+    @pytest.mark.parametrize(
+        "freq, target_freq",
+        [("YS-JAN", "YS-JAN"), ("QS", "QS"), ("QS", "MS"), ("MS", "MS")],
+        ids=["Y_to_Y", "Q_to_Q", "Q_to_M", "M_to_M"],
+    )
+    def test_other_dataframe_merge(self, freq, target_freq):
         start_date = "1900-01-01"
 
         low_freq_df = pd.Series(1, index=pd.date_range(start_date, freq=freq, periods=20), name="test").iloc[:-2]
@@ -82,8 +87,11 @@ class TestPandasIndex(unittest.TestCase):
         high_freq_df = pd.Series(1, index=index, name=high_freq_name)
         result = pd.merge(low_freq_df, high_freq_df, left_index=True, right_index=True, how="outer")
 
-        df, df_low, df_high, factor = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
-        self.assertEqual(df.shape[0], result.shape[0])
+        df, *_ = prepare_input_dataframes(low_freq_df, None, target_freq, "denton")
+
+        assert df.shape[0] == result.shape[0]
+        if freq == target_freq:
+            pd.testing.assert_index_equal(low_freq_df.index, high_freq_df.index)
 
 
 def test_build_conversion_matrix():
@@ -108,6 +116,31 @@ def test_build_conversion_matrix():
 
     assert C.shape[0] == low_freq_df.shape[0]
     assert C.shape[1] == high_freq_df.shape[0]
+
+
+def test_same_freq_converstion_matrix():
+    freq = "QS-OCT"
+    target_freq = "QS-OCT"
+    lf_start_date = "1995-06-01"
+    hf_start_date = "1995-06-01"
+    end_date = "2001-12-01"
+
+    low_freq_df = pd.Series(1, index=pd.date_range(lf_start_date, end_date, freq=freq), name="low_freq")
+    high_freq_df = pd.Series(
+        1,
+        index=pd.date_range(hf_start_date, end_date, freq=target_freq),
+        name="low_freq",
+    )
+
+    df, low_freq_df, high_freq_df, time_conversion_factor = prepare_input_dataframes(
+        low_freq_df, high_freq_df, target_freq, "denton"
+    )
+
+    # When frequencies are the same, the conversion matrix should be an identity matrix regardless of the
+    # aggregation function used (there is no aggregation)
+    for agg_func in ["sum", "mean", "first", "last"]:
+        C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func=agg_func)
+        np.testing.assert_allclose(C, np.eye(C.shape[0]))
 
 
 if __name__ == "__main__":

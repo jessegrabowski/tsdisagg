@@ -11,8 +11,9 @@ from hypothesis import given
 from hypothesis.strategies import SearchStrategy, composite, integers
 
 from tsdisagg import disaggregate_series
+from tsdisagg.datasets import load_data
 from tsdisagg.time_conversion import FREQ_CONVERSION_FACTORS, MONTHS, get_frequency_name
-from tsdisagg.ts_disagg import build_conversion_matrix
+from tsdisagg.ts_disagg import METHOD, build_conversion_matrix
 
 
 def generate_random_index_pair(
@@ -93,6 +94,26 @@ def frequencies(draw: Callable[[SearchStrategy[int]], int]) -> tuple[str, str]:
         high_freq += "-" + month
 
     return low_freq, high_freq
+
+
+@pytest.fixture()
+def exports_m():
+    return load_data("monthly_exports")
+
+
+@pytest.fixture()
+def sales_a():
+    return load_data("annual_sales")
+
+
+@pytest.fixture()
+def exports_q():
+    return load_data("quarterly_exports")
+
+
+@pytest.fixture()
+def imports_q():
+    return load_data("quarterly_imports")
 
 
 @given(frequencies())
@@ -374,14 +395,6 @@ def test_invalid_dataframe_warnings():
             agg_func="sum",
         )
 
-    with pytest.raises(ValueError, match="low_freq_df has missing values"):
-        disaggregate_series(
-            pd.DataFrame({"data": [1, np.nan, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
-            pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
-            method="denton",
-            agg_func="sum",
-        )
-
     with pytest.raises(ValueError, match="high_freq_df has missing values"):
         disaggregate_series(
             pd.DataFrame({"data": [1, 2, 3]}, index=pd.date_range("2020-01-01", periods=3, freq="D")),
@@ -435,6 +448,34 @@ def test_invalid_dataframe_warnings():
             method="litterman",
             agg_func="sum",
         )
+
+
+@pytest.mark.parametrize("method", ["denton", "chow-lin", "litterman"])
+@pytest.mark.parametrize("missing_in_center", [True, False])
+def test_disagg_with_internal_low_freq_missing(sales_a, exports_m, method: METHOD, missing_in_center):
+    sales_a = sales_a.copy()
+
+    if missing_in_center:
+        sales_a.iloc[10] = np.nan
+    else:
+        sales_a.iloc[0] = np.nan
+
+    result = disaggregate_series(
+        sales_a,
+        high_freq_df=exports_m.assign(Constant=1) if "denton" not in method else None,
+        method=method,
+        agg_func="sum",
+        target_freq="MS",
+        optimizer_kwargs={"method": "nelder-mead"},
+        verbose=False,
+    )
+
+    assert result.isna().sum() == 0
+
+    if "denton" in method:
+        assert np.all(result.index == pd.date_range(start=sales_a.index[0], periods=12 * sales_a.shape[0], freq="MS"))
+    else:
+        assert np.all(result.index == exports_m.index)
 
 
 if __name__ == "__main__":

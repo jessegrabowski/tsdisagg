@@ -57,7 +57,15 @@ def build_conversion_matrix(
     low_index, high_index = low_freq_df.index, high_freq_df.index
     low_freq, _high_freq = low_index.freq, high_index.freq
 
-    low_freq_period = "Y" if low_freq.name.startswith("Y") or low_freq.name.startswith("BY") else "Q"
+    if low_freq.name.startswith("Y") or low_freq.name.startswith("BY"):
+        low_freq_period = "Y"
+    elif low_freq.name.startswith("Q") or low_freq.name.startswith("BQ"):
+        low_freq_period = "Q"
+    elif low_freq.name.startswith("M"):
+        low_freq_period = "M"
+    else:
+        raise ValueError(f"Unknown low_freq: {low_freq.name}. Expected yearly, quarterly or monthly frequency.")
+
     high_freq_df["low_freq_period"] = high_freq_df.index.to_period(freq=low_freq_period)
     period_to_row_idx = {period: idx for idx, period in enumerate(low_freq_df.index.to_period(low_freq_period))}
 
@@ -259,8 +267,8 @@ def prepare_input_dataframes(low_freq_df, high_freq_df, target_freq, method):  #
     if not isinstance(low_freq_df.index, pd.core.indexes.datetimes.DatetimeIndex):
         raise TypeError("No datetime index found on the dataframe passed as argument to low_freq_df.")
 
-    if low_freq_df.isna().any().any():
-        raise ValueError("low_freq_df has missing values.")
+    # if low_freq_df.isna().any().any():
+    #     raise ValueError("low_freq_df has missing values.")
 
     if high_freq_df is not None:
         if not isinstance(high_freq_df.index, pd.core.indexes.datetimes.DatetimeIndex):
@@ -422,7 +430,8 @@ def disaggregate_series(
     )
 
     C = build_conversion_matrix(low_freq_df, high_freq_df, time_conversion_factor, agg_func)
-    drop_rows = np.all(C == 0, axis=1)
+    drop_rows = np.all(C == 0, axis=1) | low_freq_df.isna().values.ravel()
+
     if any(drop_rows):
         dropped = low_freq_df.index.strftime("%Y-%m-%d")[drop_rows]
         warnings.warn(
@@ -431,7 +440,7 @@ def disaggregate_series(
             stacklevel=2,
         )
 
-    y = df.iloc[:, target_idx].dropna().loc[~drop_rows]
+    y = low_freq_df.loc[~drop_rows].squeeze()
     C = C[~drop_rows, :]
     X = df.drop(columns=df.columns[target_idx])
 
@@ -443,7 +452,16 @@ def disaggregate_series(
     ul = y - C @ p
     y_hat = p + D @ ul
 
-    output = pd.Series(y_hat, index=df.index, name=target_column)
+    if not isinstance(y_hat, pd.Series | pd.DataFrame):
+        output = pd.Series(y_hat, index=df.index, name=target_column)
+    elif isinstance(y_hat, pd.Series):
+        output = y_hat
+        output.name = target_column
+    else:
+        output = y_hat.iloc[:, 0]
+        output.name = target_column
+
+    output.index = df.index
     output.index.freq = output.index.inferred_freq
 
     if return_optim_res and result is not None:
